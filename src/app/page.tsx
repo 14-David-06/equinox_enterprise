@@ -1,65 +1,74 @@
-import Image from "next/image";
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import Image from 'next/image';
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+    <div className="min-h-screen bg-white">
+      <Navbar />
+      <main>
+        {/* Hero Section */}
+        <section id="home" className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-black py-20">
+          <div className="container mx-auto text-center px-4">
+            <h1 className="text-5xl font-bold mb-4">Bienvenido a Equinox Transportation</h1>
+            <p className="text-xl mb-8">Soluciones de transporte confiables, eficientes y seguras para su negocio.</p>
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              src="/logo-equinox-animacion.jpg"
+              alt="Logo Equinox con Slogan y Animación"
+              width={300}
+              height={200}
+              className="mx-auto mb-8"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            <button className="bg-black text-white px-8 py-3 rounded-full hover:bg-gray-800 transition duration-300">
+              Comenzar
+            </button>
+          </div>
+        </section>
+
+        {/* Services Section */}
+        <section id="services" className="py-20 bg-gray-100">
+          <div className="container mx-auto px-4">
+            <h2 className="text-4xl font-bold text-center mb-12 text-black">Nuestros Servicios</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="bg-white p-6 rounded-lg shadow-md text-center">
+                <h3 className="text-2xl font-semibold mb-4 text-yellow-500">Transporte de Carga</h3>
+                <p className="text-gray-600">Transporte eficiente y seguro de carga en todo el país.</p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-md text-center">
+                <h3 className="text-2xl font-semibold mb-4 text-yellow-500">Entrega Exprés</h3>
+                <p className="text-gray-600">Servicios rápidos y confiables de entrega exprés para envíos urgentes.</p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-md text-center">
+                <h3 className="text-2xl font-semibold mb-4 text-yellow-500">Almacenamiento</h3>
+                <p className="text-gray-600">Soluciones seguras de almacenamiento para guardar sus mercancías de manera segura.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* About Section */}
+        <section id="about" className="py-20 bg-black text-white">
+          <div className="container mx-auto px-4 text-center">
+            <h2 className="text-4xl font-bold mb-8 text-yellow-400">Acerca de Equinox</h2>
+            <p className="text-xl max-w-3xl mx-auto">
+              Equinox Transportation se compromete a proporcionar servicios de logística y transporte de primera clase.
+              Con años de experiencia en la industria, garantizamos que sus mercancías lleguen a su destino de manera segura y a tiempo.
+            </p>
+          </div>
+        </section>
+
+        {/* Contact Section */}
+        <section id="contact" className="py-20 bg-gray-100">
+          <div className="container mx-auto px-4 text-center">
+            <h2 className="text-4xl font-bold mb-8 text-black">Contáctenos</h2>
+            <p className="text-xl mb-8 text-gray-600">¿Listo para trabajar con nosotros? ¡Póngase en contacto hoy!</p>
+            <button className="bg-yellow-500 text-black px-8 py-3 rounded-full hover:bg-yellow-600 transition duration-300">
+              Contactar Ahora
+            </button>
+          </div>
+        </section>
       </main>
+      <Footer />
     </div>
   );
 }
