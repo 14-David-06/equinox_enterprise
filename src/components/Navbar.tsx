@@ -25,13 +25,10 @@ const Navbar = () => {
           <Image
             src="/logo-equinox-removebg-preview.png"
             alt="Logo Equinox"
-            width={60}
-            height={60}
+            width={160}
+            height={160}
             className="mr-3 group-hover:scale-110 transition-transform duration-300"
           />
-          <span className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-300 bg-clip-text text-transparent">
-            Equinox
-          </span>
         </Link>
         <ul className="flex space-x-8 items-center">
           <li>
