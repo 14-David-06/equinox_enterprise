@@ -28,10 +28,6 @@ export default function Home() {
               <p className="text-xl md:text-2xl mb-10 text-gray-300 animate-fade-in-up-delay">
                 Soluciones de transporte confiables, eficientes y seguras para su negocio
               </p>
-              <button className="group relative px-10 py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-semibold rounded-full overflow-hidden shadow-lg hover:shadow-yellow-500/50 transition-all duration-300 hover:scale-105 animate-fade-in-up-delay-2">
-                <span className="relative z-10">Acceder</span>
-                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-              </button>
             </div>
           </div>
         </section>

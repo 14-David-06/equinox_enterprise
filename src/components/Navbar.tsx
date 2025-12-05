@@ -49,11 +49,10 @@ const Navbar = () => {
           </li>
           <li>
             <Link 
-              href="#contact" 
-              className="group relative px-6 py-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-semibold rounded-full overflow-hidden hover:shadow-lg hover:shadow-yellow-500/50 transition-all duration-300 hover:scale-105"
+              href="/inspeccion" 
+              className="text-gray-300 hover:text-yellow-400 transition-colors duration-300 font-medium"
             >
-              <span className="relative z-10">Acceder</span>
-              <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+              Preoperacional
             </Link>
           </li>
         </ul>
