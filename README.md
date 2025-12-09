@@ -34,3 +34,22 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Seguridad: prevención de secretos en el repo
+
+Este repositorio incluye reglas para detectar secretos accidentalmente commiteados.
+
+- Pre-commit: Husky + gitleaks bloquean commits que contienen claves/secretos.
+- CI: workflow de GitHub Actions ejecuta gitleaks en Pull Requests y falla si detecta secretos.
+
+Para instalar y usar localmente:
+
+```bash
+# instalar hooks de husky (solo una vez en la máquina del dev)
+npm run prepare
+
+# para probar manualmente el escaneo en staged files
+npm run scan:secrets
+```
+
+Si se detectan secretos, revoca la clave inmediatamente y reemplázala por una variable de entorno o un secret manager (Vercel / GitHub Secrets / Doppler / 1Password).

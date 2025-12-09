@@ -1,0 +1,25 @@
+title = "gitleaks config for equinox_enterprise"
+
+[rules]
+
+  [[rules.rule]]
+  description = "Generic AWS Access Key"
+  regex = '''AKIA[0-9A-Z]{16}'''
+
+  [[rules.rule]]
+  description = "AWS Secret Key"
+  regex = '''(?i)aws(.{0,20})?(secret|secret_key|access|access_key)(.{0,20})?=[\s\"]?([A-Za-z0-9/+=]{40})'''
+
+  [[rules.rule]]
+  description = "Generic API Key (high entropy)"
+  entropy = 4.5
+
+  [[rules.rule]]
+  description = "JWT token"
+  regex = '''eyJ[a-zA-Z0-9-_]{10,}'''
+
+  [[rules.rule]]
+  description = "Common tokens and secrets (basic)"
+  regex = '''(?i)(token|secret|passwd|password|api_key|apikey|auth)\s*[:=]\s*['\"]?[A-Za-z0-9-_.]{8,}['\"]?'''
+
+# You can extend this file with more precise rules, or add allowlists when needed
