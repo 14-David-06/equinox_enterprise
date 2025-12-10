@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Modelo principal de Inspección Preoperacional
+model Inspeccion {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Encabezado
+  codigo                String?
+  version               String?
+  fechaEdicion          String?
+  fechaInspeccionDesde  String?
+  fechaInspeccionHasta  String?
+  mes                   String?
+  anio                  String?
+
+  // Documentos - SOAT
+  soatEstado            String?
+  soatVencimiento       String?
+
+  // Documentos - Revisión Técnica
+  revisionTecnicaEstado      String?
+  revisionTecnicaVencimiento String?
+
+  // Documentos - Póliza
+  polizaEstado          String?
+  polizaVencimiento     String?
+
+  // Documentos - Licencia
+  licenciaEstado        String?
+  licenciaVencimiento   String?
+
+  // Categorías (guardadas como JSON string)
+  categorias            String?
+
+  // Conductor
+  nombreConductor       String?
+  cedula                String?
+  edad                  String?
+  arl                   String?
+  eps                   String?
+  fondoPension          String?
+  rh                    String?
+
+  // Vehículo
+  placaVehiculo         String?
+  marcaVehiculo         String?
+  lineaVehiculo         String?
+  modeloVehiculo        String?
+
+  // Remolque
+  placaRemolque         String?
+  marcaRemolque         String?
+  claseRemolque         String?
+  modeloRemolque        String?
+
+  // Horas dormir
+  horasDormir           String?
+
+  // Kilometraje (guardado como JSON string con 31 días)
+  kilometraje           String?
+
+  // Salud
+  tomaMedicacion        String?
+  ansiedadEstres        String?
+  problemasVisuales     String?
+  estadoSalud           String?
+}
+
+// Modelo de Usuario para autenticación
+model Usuario {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cedula    String   @unique
+  password  String
+  nombre    String
+  email     String?
+  telefono  String?
+  rol       String   @default("conductor") // conductor, admin, supervisor
+  activo    Boolean  @default(true)
+}

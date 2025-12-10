@@ -4,6 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export default function InspeccionPage() {
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     // Encabezado
     codigo: '',
@@ -72,10 +73,35 @@ export default function InspeccionPage() {
     setFormData(prev => ({ ...prev, [fieldName]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Formulario enviado:', formData);
-    alert('Formulario de inspección enviado correctamente');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/inspecciones', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al guardar la inspección');
+      }
+
+      const data = await response.json();
+      alert('✅ Inspección guardada correctamente en la base de datos');
+      
+      // Opcional: Limpiar el formulario después de guardar
+      // setFormData({ ...initialFormData });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al guardar la inspección';
+      alert(`❌ ${errorMessage}. Intente de nuevo.`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -786,9 +812,12 @@ export default function InspeccionPage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
               <button
                 type="submit"
-                className="group relative px-8 sm:px-12 py-3 sm:py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-bold text-base sm:text-lg rounded-full overflow-hidden shadow-xl hover:shadow-yellow-500/50 transition-all duration-300 hover:scale-105"
+                disabled={isLoading}
+                className="group relative px-8 sm:px-12 py-3 sm:py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-bold text-base sm:text-lg rounded-full overflow-hidden shadow-xl hover:shadow-yellow-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                <span className="relative z-10">Enviar Inspección</span>
+                <span className="relative z-10">
+                  {isLoading ? '⏳ Guardando...' : 'Enviar Inspección'}
+                </span>
                 <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
               </button>
               <button

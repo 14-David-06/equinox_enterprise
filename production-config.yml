@@ -1,0 +1,19 @@
+# Security Headers Configuration
+security:
+  headers:
+    X-Content-Type-Options: nosniff
+    X-Frame-Options: DENY
+    X-XSS-Protection: "1; mode=block"
+    Referrer-Policy: strict-origin-when-cross-origin
+    Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Environment Variables Required
+env_required:
+  - TURSO_DATABASE_URL
+  - TURSO_AUTH_TOKEN
+  - AUTH_SECRET
+
+# Performance
+build:
+  output: standalone
+  compress: true
