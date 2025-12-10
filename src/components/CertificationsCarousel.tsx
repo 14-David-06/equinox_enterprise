@@ -107,7 +107,7 @@ export default function CertificationsCarousel() {
                               width={cert.name === 'NORSOK S-006' ? 280 : 200}
                               height={cert.name === 'NORSOK S-006' ? 200 : 150}
                               className={`w-auto mx-auto object-contain filter brightness-100 contrast-110 ${
-                                cert.name === 'NORSOK S-006' ? 'h-50' : 'h-32'
+                                cert.name === 'NORSOK S-006' ? 'h-5gir0' : 'h-32'
                               }`}
                               priority={index === 0}
                             />
