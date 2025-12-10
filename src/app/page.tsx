@@ -1,5 +1,6 @@
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import CertificationsCarousel from '@/components/CertificationsCarousel';
 import Image from 'next/image';
 
 export default function Home() {
@@ -91,6 +92,9 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Certifications Carousel Section */}
+        <CertificationsCarousel />
 
         {/* Contact Section */}
         <section id="contact" className="py-24 relative">
