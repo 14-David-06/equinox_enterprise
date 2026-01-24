@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import base, { Tables } from '@/lib/airtable';
+import base, { TABLES } from '@/lib/airtable';
 import bcrypt from 'bcryptjs';
 import { signToken } from '@/lib/jwt';
 import cookie from 'cookie';
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const { cedula, password } = validation.data;
 
     // Buscar usuario por cédula en Airtable
-    const records = await base(Tables.USUARIOS).select({
+    const records = await base(TABLES.USUARIOS.ID).select({
       filterByFormula: `{cedula} = "${cedula}"`
     }).all();
 

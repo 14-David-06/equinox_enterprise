@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import base, { Tables } from '@/lib/airtable';
+import base, { TABLES } from '@/lib/airtable';
 import { verifyToken } from '@/lib/jwt';
 import cookie from 'cookie';
 
@@ -16,8 +16,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Consultar inspecciones desde Airtable
-    const records = await base(Tables.INSPECCIONES).select({
-      sort: [{ field: 'createdAt', direction: 'desc' }]
+    // TODO: Configurar tabla de inspecciones en Airtable
+    // Temporalmente usando tabla LOGS como placeholder
+    const records = await base(TABLES.LOGS.ID).select({
+      sort: [{ field: 'createdTime', direction: 'desc' }]
     }).all();
 
     // Formatear los datos de Airtable
