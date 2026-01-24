@@ -1,0 +1,28 @@
+name: Detect secrets with gitleaks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  gitleaks-scan:
+    name: Gitleaks scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run gitleaks action (detect secrets)
+        uses: zricethezav/gitleaks-action@v2
+        with:
+          args: detect --source . --report-format json --exit-code 1
+
+      - name: Upload gitleaks report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json

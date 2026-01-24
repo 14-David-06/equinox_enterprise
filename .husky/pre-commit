@@ -1,0 +1,20 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "Running pre-commit secret scan (gitleaks or local scan)..."
+
+# If gitleaks CLI is installed use it; otherwise run our local Node scanner
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks detect --staged --exit-code 1 || {
+    echo "\n🔐 gitleaks found potential secrets. Commit aborted.\n";
+    exit 1;
+  }
+else
+  echo "gitleaks not found locally — running local scanner"
+  node ./scripts/check-secrets.js || {
+    echo "\n🔐 Se detectaron posibles secretos por el scanner local. Commit abortado.\n";
+    exit 1;
+  }
+fi
+
+echo "Pre-commit checks passed."

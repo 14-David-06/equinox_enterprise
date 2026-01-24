@@ -1,0 +1,4 @@
+# .gitleaksignore - Safe development patterns ignored by gitleaks
+# This file contains fingerprints of safe code patterns that are not actual secrets
+
+# All safe patterns are configured in .gitleaks.toml allowlist section
