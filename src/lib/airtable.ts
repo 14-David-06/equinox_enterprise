@@ -1,93 +1,157 @@
-import Airtable from 'airtable';
 import { 
-  AIRTABLE_CONFIG, 
-  TABLES, 
+  getAirtableConfig, 
+  TABLES,
   USUARIO_FIELDS, 
   LOG_FIELDS,
-  SELECT_OPTIONS,
-  validateConfig 
 } from './airtable-config';
 
 /**
- * Cliente de Airtable para el Sistema Equinox Users Core
+ * Cliente de Airtable para Equinox System Core
  * 
- * Este módulo proporciona acceso configurado a la base de datos
- * Airtable del Sistema Equinox Users Core.
+ * Usa fetch directo a la API de Airtable para mejor compatibilidad.
  */
 
-// Validar configuración al inicializar
-validateConfig();
+interface AirtableRecord {
+  id: string;
+  createdTime: string;
+  fields: Record<string, unknown>;
+}
 
-// Configurar cliente de Airtable
-Airtable.configure({
-  endpointUrl: AIRTABLE_CONFIG.BASE_URL,
-  apiKey: AIRTABLE_CONFIG.API_KEY,
-});
+interface AirtableResponse {
+  records: AirtableRecord[];
+  offset?: string;
+}
 
-// Base principal del Sistema Equinox Users Core
-const base = Airtable.base(AIRTABLE_CONFIG.BASE_ID);
+// Función para hacer peticiones a la API de Airtable
+async function airtableFetch(
+  tableName: string, 
+  options: {
+    method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+    params?: Record<string, string>;
+    body?: Record<string, unknown>;
+    recordId?: string;
+  } = {}
+): Promise<AirtableResponse | AirtableRecord> {
+  const config = getAirtableConfig();
+  
+  if (!config.API_KEY) {
+    throw new Error('AIRTABLE_EQUINOX_USERS_CORE_API_KEY no está configurada');
+  }
 
-export default base;
+  const { method = 'GET', params, body, recordId } = options;
+  
+  // Construir URL
+  let url = `${config.BASE_URL}/${config.BASE_ID}/${encodeURIComponent(tableName)}`;
+  if (recordId) {
+    url += `/${recordId}`;
+  }
+  
+  // Agregar query params para GET
+  if (params && method === 'GET') {
+    const searchParams = new URLSearchParams(params);
+    url += `?${searchParams.toString()}`;
+  }
+
+  const fetchOptions: RequestInit = {
+    method,
+    headers: {
+      'Authorization': `Bearer ${config.API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  };
+
+  if (body && (method === 'POST' || method === 'PATCH')) {
+    fetchOptions.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(url, fetchOptions);
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error?.message || 
+      `Airtable error: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+// Función para listar registros con filtro
+async function selectRecords(
+  tableName: string,
+  options: {
+    filterByFormula?: string;
+    maxRecords?: number;
+    view?: string;
+    fields?: string[];
+  } = {}
+): Promise<AirtableRecord[]> {
+  const params: Record<string, string> = {};
+  
+  if (options.filterByFormula) {
+    params.filterByFormula = options.filterByFormula;
+  }
+  if (options.maxRecords) {
+    params.maxRecords = String(options.maxRecords);
+  }
+  if (options.view) {
+    params.view = options.view;
+  }
+  
+  const response = await airtableFetch(tableName, { params }) as AirtableResponse;
+  return response.records;
+}
+
+// Función para actualizar un registro
+async function updateRecord(
+  tableName: string,
+  recordId: string,
+  fields: Record<string, unknown>
+): Promise<AirtableRecord> {
+  const response = await airtableFetch(tableName, {
+    method: 'PATCH',
+    recordId,
+    body: { fields },
+  });
+  return response as AirtableRecord;
+}
+
+// Función para crear registros
+async function createRecords(
+  tableName: string,
+  records: Array<{ fields: Record<string, unknown> }>
+): Promise<AirtableRecord[]> {
+  const response = await airtableFetch(tableName, {
+    method: 'POST',
+    body: { records },
+  }) as AirtableResponse;
+  return response.records;
+}
 
 // ===========================================
-// EXPORTAR CONFIGURACIONES
+// RE-EXPORTAR CONFIGURACIONES
 // ===========================================
 
-export {
-  AIRTABLE_CONFIG,
-  TABLES,
-  USUARIO_FIELDS,
-  LOG_FIELDS,
-  SELECT_OPTIONS,
-};
+export { TABLES, USUARIO_FIELDS, LOG_FIELDS };
 
 // ===========================================
-// TABLAS CONFIGURADAS
-// ===========================================
-
-export const UsuariosTable = base(TABLES.USUARIOS.ID);
-export const LogsTable = base(TABLES.LOGS.ID);
-
-// ===========================================
-// FUNCIONES DE UTILIDAD
+// FUNCIONES DE UTILIDAD PARA USUARIOS
 // ===========================================
 
 /**
- * Crear un nuevo usuario en Airtable
+ * Buscar usuario por número de documento (cédula)
  */
-export async function crearUsuario(usuarioData: {
-  nombreCompleto: string;
-  email: string;
-  telefono?: string;
-  password: string;
-  rol: string;
-  estado: string;
-  basesPermitidas?: string[];
-  nivelAcceso: string;
-  supervisor?: string[];
-  notas?: string;
-}) {
+export async function buscarUsuarioPorCedula(cedula: string): Promise<AirtableRecord | null> {
   try {
-    const record = await UsuariosTable.create([
-      {
-        fields: {
-          [USUARIO_FIELDS.NOMBRE_COMPLETO]: usuarioData.nombreCompleto,
-          [USUARIO_FIELDS.EMAIL]: usuarioData.email,
-          [USUARIO_FIELDS.TELEFONO]: usuarioData.telefono,
-          [USUARIO_FIELDS.PASSWORD]: usuarioData.password,
-          [USUARIO_FIELDS.ROL]: usuarioData.rol,
-          [USUARIO_FIELDS.ESTADO]: usuarioData.estado,
-          [USUARIO_FIELDS.BASES_PERMITIDAS]: usuarioData.basesPermitidas,
-          [USUARIO_FIELDS.NIVEL_ACCESO]: usuarioData.nivelAcceso,
-          [USUARIO_FIELDS.SUPERVISOR]: usuarioData.supervisor,
-          [USUARIO_FIELDS.NOTAS]: usuarioData.notas,
-        },
-      },
-    ]);
+    const records = await selectRecords(TABLES.USUARIOS.NAME, {
+      filterByFormula: `{Numero Documento} = '${cedula}'`,
+      maxRecords: 1,
+    });
 
-    return record[0];
+    return records.length > 0 ? records[0] : null;
   } catch (error) {
-    console.error('Error creando usuario:', error);
+    console.error('Error buscando usuario por cédula:', error);
     throw error;
   }
 }
@@ -95,16 +159,30 @@ export async function crearUsuario(usuarioData: {
 /**
  * Buscar usuario por email
  */
-export async function buscarUsuarioPorEmail(email: string) {
+export async function buscarUsuarioPorEmail(email: string): Promise<AirtableRecord | null> {
   try {
-    const records = await UsuariosTable.select({
-      filterByFormula: `{${USUARIO_FIELDS.EMAIL}} = '${email}'`,
+    const records = await selectRecords(TABLES.USUARIOS.NAME, {
+      filterByFormula: `{Email} = '${email}'`,
       maxRecords: 1,
-    }).firstPage();
+    });
 
     return records.length > 0 ? records[0] : null;
   } catch (error) {
     console.error('Error buscando usuario por email:', error);
+    throw error;
+  }
+}
+
+/**
+ * Actualizar contraseña de usuario
+ */
+export async function actualizarPasswordUsuario(recordId: string, hashedPassword: string): Promise<AirtableRecord> {
+  try {
+    return await updateRecord(TABLES.USUARIOS.NAME, recordId, {
+      [USUARIO_FIELDS.PASSWORD]: hashedPassword
+    });
+  } catch (error) {
+    console.error('Error actualizando contraseña:', error);
     throw error;
   }
 }
@@ -123,9 +201,9 @@ export async function crearLog(logData: {
   nivelSeveridad: string;
   ipOrigen?: string;
   automatico?: boolean;
-}) {
+}): Promise<AirtableRecord> {
   try {
-    const record = await LogsTable.create([
+    const records = await createRecords(TABLES.LOGS.NAME, [
       {
         fields: {
           [LOG_FIELDS.USUARIO]: logData.usuario,
@@ -142,7 +220,7 @@ export async function crearLog(logData: {
       },
     ]);
 
-    return record[0];
+    return records[0];
   } catch (error) {
     console.error('Error creando log:', error);
     throw error;
@@ -152,33 +230,22 @@ export async function crearLog(logData: {
 /**
  * Obtener todos los usuarios activos
  */
-export async function obtenerUsuariosActivos() {
+export async function obtenerUsuariosActivos(): Promise<AirtableRecord[]> {
   try {
-    const records = await UsuariosTable.select({
-      filterByFormula: `{${USUARIO_FIELDS.ESTADO}} = 'Activo'`,
-      sort: [{ field: USUARIO_FIELDS.NOMBRE_COMPLETO, direction: 'asc' }],
-    }).all();
-
-    return records;
+    return await selectRecords(TABLES.USUARIOS.NAME, {
+      filterByFormula: `{Estado} = 'Activo'`,
+    });
   } catch (error) {
     console.error('Error obteniendo usuarios activos:', error);
     throw error;
   }
 }
 
-/**
- * Obtener logs recientes
- */
-export async function obtenerLogsRecientes(limite: number = 50) {
-  try {
-    const records = await LogsTable.select({
-      sort: [{ field: LOG_FIELDS.FECHA_EVENTO, direction: 'desc' }],
-      maxRecords: limite,
-    }).all();
+// Default export para compatibilidad
+const airtable = {
+  selectRecords,
+  updateRecord,
+  createRecords,
+};
 
-    return records;
-  } catch (error) {
-    console.error('Error obteniendo logs recientes:', error);
-    throw error;
-  }
-}
+export default airtable;

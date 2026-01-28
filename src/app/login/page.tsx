@@ -4,15 +4,19 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 
+type Step = 'cedula' | 'password' | 'create-password';
+
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<'cedula' | 'password'>('cedula');
+  const [step, setStep] = useState<Step>('cedula');
   const [cedula, setCedula] = useState('');
+  const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleCedulaSubmit = (e: React.FormEvent) => {
+  const handleCedulaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
@@ -25,9 +29,42 @@ export default function LoginPage() {
       setError('La cédula debe tener al menos 6 dígitos');
       return;
     }
-    
-    // Avanzar al paso de contraseña
-    setStep('password');
+
+    setIsLoading(true);
+
+    try {
+      // Verificar si el usuario existe
+      const response = await fetch('/api/auth/check-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ cedula }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al verificar usuario');
+      }
+
+      if (!data.exists) {
+        throw new Error('Usuario no encontrado');
+      }
+
+      setUserName(data.nombre || 'Usuario');
+
+      // Si el usuario no tiene contraseña, ir al paso de crear contraseña
+      if (!data.hasPassword) {
+        setStep('create-password');
+      } else {
+        setStep('password');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al verificar usuario');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -42,8 +79,6 @@ export default function LoginPage() {
     }
 
     try {
-      // Aquí puedes agregar la lógica de autenticación real
-      // Por ahora simulamos una verificación básica
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -68,10 +103,80 @@ export default function LoginPage() {
     }
   };
 
-  const handleBack = () => {
-    setStep('cedula');
-    setPassword('');
+  const handleCreatePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
+
+    if (!password.trim()) {
+      setError('Por favor ingrese una contraseña');
+      return;
+    }
+
+    if (password.length < 4) {
+      setError('La contraseña debe tener al menos 4 caracteres');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ cedula, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al crear contraseña');
+      }
+
+      // Login exitoso - redirigir al dashboard o página principal
+      router.push('/inspeccion');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al crear contraseña');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBack = () => {
+    if (step === 'password' || step === 'create-password') {
+      setStep('cedula');
+      setPassword('');
+      setConfirmPassword('');
+      setError('');
+    }
+  };
+
+  const getStepTitle = () => {
+    switch (step) {
+      case 'cedula':
+        return 'Ingrese su número de cédula para continuar';
+      case 'password':
+        return `Bienvenido, ${userName}`;
+      case 'create-password':
+        return `Bienvenido, ${userName}`;
+    }
+  };
+
+  const getStepNumber = () => {
+    switch (step) {
+      case 'cedula':
+        return 1;
+      case 'password':
+      case 'create-password':
+        return 2;
+    }
   };
 
   return (
@@ -100,19 +205,17 @@ export default function LoginPage() {
             Iniciar Sesión
           </h1>
           <p className="text-gray-400 text-center mb-8">
-            {step === 'cedula' 
-              ? 'Ingrese su número de cédula para continuar' 
-              : 'Ingrese su contraseña'}
+            {getStepTitle()}
           </p>
 
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-3 mb-8">
             <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
-              step === 'cedula' ? 'bg-yellow-400 scale-125' : 'bg-yellow-400'
+              getStepNumber() === 1 ? 'bg-yellow-400 scale-125' : 'bg-yellow-400'
             }`}></div>
-            <div className={`w-8 h-0.5 ${step === 'password' ? 'bg-yellow-400' : 'bg-white/20'}`}></div>
+            <div className={`w-8 h-0.5 ${getStepNumber() === 2 ? 'bg-yellow-400' : 'bg-white/20'}`}></div>
             <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
-              step === 'password' ? 'bg-yellow-400 scale-125' : 'bg-white/20'
+              getStepNumber() === 2 ? 'bg-yellow-400 scale-125' : 'bg-white/20'
             }`}></div>
           </div>
 
@@ -122,7 +225,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {step === 'cedula' ? (
+          {step === 'cedula' && (
             <form onSubmit={handleCedulaSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -141,18 +244,22 @@ export default function LoginPage() {
                     placeholder="Ej: 1234567890"
                     className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition-all duration-300"
                     autoFocus
+                    disabled={isLoading}
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-bold rounded-xl hover:shadow-lg hover:shadow-yellow-500/30 hover:scale-[1.02] transition-all duration-300"
+                disabled={isLoading}
+                className="w-full py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-bold rounded-xl hover:shadow-lg hover:shadow-yellow-500/30 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                Continuar
+                {isLoading ? 'Verificando...' : 'Continuar'}
               </button>
             </form>
-          ) : (
+          )}
+
+          {step === 'password' && (
             <form onSubmit={handlePasswordSubmit} className="space-y-6">
               <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
                 <p className="text-xs text-gray-400">Cédula</p>
@@ -176,6 +283,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition-all duration-300"
                     autoFocus
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -184,7 +292,8 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="flex-1 py-4 bg-white/5 border border-white/10 text-white font-semibold rounded-xl hover:bg-white/10 transition-all duration-300"
+                  disabled={isLoading}
+                  className="flex-1 py-4 bg-white/5 border border-white/10 text-white font-semibold rounded-xl hover:bg-white/10 transition-all duration-300 disabled:opacity-50"
                 >
                   Volver
                 </button>
@@ -194,6 +303,82 @@ export default function LoginPage() {
                   className="flex-1 py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-bold rounded-xl hover:shadow-lg hover:shadow-yellow-500/30 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   {isLoading ? 'Ingresando...' : 'Ingresar'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {step === 'create-password' && (
+            <form onSubmit={handleCreatePasswordSubmit} className="space-y-6">
+              <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                <p className="text-yellow-400 text-sm text-center">
+                  🎉 ¡Primera vez aquí! Crea tu contraseña para continuar.
+                </p>
+              </div>
+
+              <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
+                <p className="text-xs text-gray-400">Cédula</p>
+                <p className="text-white font-medium">{cedula}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Nueva Contraseña
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </span>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Mínimo 4 caracteres"
+                    className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition-all duration-300"
+                    autoFocus
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Confirmar Contraseña
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </span>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repite tu contraseña"
+                    className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition-all duration-300"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  disabled={isLoading}
+                  className="flex-1 py-4 bg-white/5 border border-white/10 text-white font-semibold rounded-xl hover:bg-white/10 transition-all duration-300 disabled:opacity-50"
+                >
+                  Volver
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex-1 py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-bold rounded-xl hover:shadow-lg hover:shadow-yellow-500/30 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isLoading ? 'Creando...' : 'Crear Contraseña'}
                 </button>
               </div>
             </form>

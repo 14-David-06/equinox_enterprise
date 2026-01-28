@@ -18,6 +18,12 @@ const rules = [
   { name: 'Potential AWS Secret', regex: new RegExp('aws(.{0,20})?(secret|secret_key|access|access_key)(.{0,20})?=[\\s\\\"]?([A-Za-z0-9/+=]{40})','gi') },
   { name: 'JWT token', regex: /eyJ[A-Za-z0-9-_]{10,}\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_.]+/g },
   { name: 'Generic token like api_key', regex: new RegExp('(token|secret|passwd|password|api_key|apikey|auth)\\s*[:=]\\s*[\'\\\"]?[A-Za-z0-9-_.]{8,}[\'\\\"]?','gi') },
+  // Airtable patterns
+  { name: 'Airtable Personal Access Token', regex: /pat[A-Za-z0-9]{14,}\.[a-f0-9]{64}/g },
+  { name: 'Airtable Base ID', regex: /app[A-Za-z0-9]{14,}/g },
+  { name: 'Airtable Table ID', regex: /tbl[A-Za-z0-9]{14,}/g },
+  { name: 'Airtable Field ID', regex: /fld[A-Za-z0-9]{14,}/g },
+  { name: 'Airtable Record ID', regex: /rec[A-Za-z0-9]{14,}/g },
 ];
 
 function scanFile(file) {

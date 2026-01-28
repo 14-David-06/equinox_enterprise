@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Schemas de validación con Zod para los endpoints de la API
  */
 
-// Schema para login
+// Schema para login (más permisivo para usuarios existentes)
 export const loginSchema = z.object({
   cedula: z.string()
     .min(6, 'La cédula debe tener al menos 6 caracteres')
@@ -15,15 +15,22 @@ export const loginSchema = z.object({
     .max(100, 'La contraseña no puede exceder 100 caracteres'),
 });
 
+// Schema para contraseña segura (para crear nuevas contraseñas)
+export const passwordSecuroSchema = z.string()
+  .min(8, 'La contraseña debe tener al menos 8 caracteres')
+  .max(100, 'La contraseña no puede exceder 100 caracteres')
+  .regex(/[A-Z]/, 'Debe contener al menos una letra mayúscula')
+  .regex(/[a-z]/, 'Debe contener al menos una letra minúscula')
+  .regex(/[0-9]/, 'Debe contener al menos un número')
+  .regex(/[^A-Za-z0-9]/, 'Debe contener al menos un carácter especial (!@#$%^&*)');
+
 // Schema para crear usuario
 export const createUsuarioSchema = z.object({
   cedula: z.string()
     .min(6, 'La cédula debe tener al menos 6 caracteres')
     .max(20, 'La cédula no puede exceder 20 caracteres')
     .regex(/^[0-9]+$/, 'La cédula solo puede contener números'),
-  password: z.string()
-    .min(4, 'La contraseña debe tener al menos 4 caracteres')
-    .max(100, 'La contraseña no puede exceder 100 caracteres'),
+  password: passwordSecuroSchema,
   nombre: z.string()
     .min(2, 'El nombre debe tener al menos 2 caracteres')
     .max(100, 'El nombre no puede exceder 100 caracteres'),

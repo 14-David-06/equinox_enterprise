@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import base, { TABLES } from '@/lib/airtable';
+import { buscarUsuarioPorCedula, actualizarPasswordUsuario, USUARIO_FIELDS } from '@/lib/airtable';
 import bcrypt from 'bcryptjs';
 import { signToken } from '@/lib/jwt';
 import cookie from 'cookie';
@@ -42,35 +42,48 @@ export async function POST(request: NextRequest) {
 
     const { cedula, password } = validation.data;
 
-    // Buscar usuario por cédula en Airtable
-    const records = await base(TABLES.USUARIOS.ID).select({
-      filterByFormula: `{cedula} = "${cedula}"`
-    }).all();
+    // Buscar usuario por número de documento en Airtable
+    const usuario = await buscarUsuarioPorCedula(cedula);
 
-    if (records.length === 0) {
+    if (!usuario) {
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 401 }
       );
     }
 
-    const usuario = records[0];
+    // Verificar si el usuario tiene contraseña
+    const storedPassword = usuario.fields[USUARIO_FIELDS.PASSWORD] as string | undefined;
+    const hasPassword = storedPassword && storedPassword.trim() !== '';
 
-    // Verificar contraseña con bcrypt
-    const isValidPassword = await bcrypt.compare(password, usuario.fields.password as string);
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { error: 'Contraseña incorrecta' },
-        { status: 401 }
-      );
+    if (!hasPassword) {
+      // Usuario sin contraseña: hashear la nueva contraseña y guardarla
+      const hashedPassword = await bcrypt.hash(password, 12);
+      
+      // Actualizar el registro en Airtable
+      await actualizarPasswordUsuario(usuario.id, hashedPassword);
+
+      logger.info('Password set for user', { 
+        userId: usuario.id, 
+        cedula: usuario.fields[USUARIO_FIELDS.NUMERO_DOCUMENTO],
+      });
+    } else {
+      // Usuario con contraseña: verificar
+      const isValidPassword = await bcrypt.compare(password, storedPassword);
+      if (!isValidPassword) {
+        return NextResponse.json(
+          { error: 'Contraseña incorrecta' },
+          { status: 401 }
+        );
+      }
     }
 
     // Generar token JWT simple (7 días)
     const token = signToken({ 
       id: usuario.id, 
-      cedula: usuario.fields.cedula, 
-      nombre: usuario.fields.nombre, 
-      rol: usuario.fields.rol 
+      cedula: usuario.fields[USUARIO_FIELDS.NUMERO_DOCUMENTO], 
+      nombre: usuario.fields[USUARIO_FIELDS.NOMBRE_COMPLETO], 
+      rol: usuario.fields[USUARIO_FIELDS.ROL] 
     }, '7d');
 
     const tokenCookie = cookie.serialize('token', token, {
@@ -83,11 +96,12 @@ export async function POST(request: NextRequest) {
 
     const responseBody = {
       success: true,
+      isFirstLogin: !hasPassword,
       usuario: {
         id: usuario.id,
-        nombre: usuario.fields.nombre,
-        cedula: usuario.fields.cedula,
-        rol: usuario.fields.rol,
+        nombre: usuario.fields[USUARIO_FIELDS.NOMBRE_COMPLETO],
+        cedula: usuario.fields[USUARIO_FIELDS.NUMERO_DOCUMENTO],
+        rol: usuario.fields[USUARIO_FIELDS.ROL],
       },
     };
 
@@ -96,7 +110,7 @@ export async function POST(request: NextRequest) {
     
     logger.info('Login successful', { 
       userId: usuario.id, 
-      cedula: usuario.fields.cedula,
+      cedula: usuario.fields[USUARIO_FIELDS.NUMERO_DOCUMENTO],
     });
     
     return res;
