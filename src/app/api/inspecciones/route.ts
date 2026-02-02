@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Consultar desde Airtable
-    const data = await fetchAirtable(TABLES.INSPECCIONES.NAME, { maxRecords: '50' });
+    const data = await fetchAirtable(TABLES.INSPECCIONES_PREOPERACIONALES.NAME, { maxRecords: '50' });
 
     // Formatear los datos de Airtable
     const inspeccionesFormateadas = data.records.map((record: any) => ({
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Crear el registro en Airtable
-    const result = await createAirtableRecord(TABLES.INSPECCIONES.NAME, fields);
+    const result = await createAirtableRecord(TABLES.INSPECCIONES_PREOPERACIONALES.NAME, fields);
 
     return NextResponse.json({
       success: true,
