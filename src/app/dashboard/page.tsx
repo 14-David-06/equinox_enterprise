@@ -197,8 +197,21 @@ export default function DashboardPage() {
           polizaVencimiento: record['Poliza Vencimiento'] || null,
           licenciaEstado: record['Licencia Cumple'] ? 'Vigente' : 'Vencido',
           licenciaVencimiento: record['Licencia Vencimiento'] || null,
-          // Categorías
-          categorias: record['Categorias Licencia'] ? record['Categorias Licencia'].join(', ') : null,
+          // Categorías - puede venir como array o como JSON string
+          categorias: (() => {
+            const cats = record['Categorias Licencia'];
+            if (!cats) return null;
+            if (Array.isArray(cats)) return cats.join(', ');
+            if (typeof cats === 'string') {
+              try {
+                const parsed = JSON.parse(cats);
+                return Array.isArray(parsed) ? parsed.join(', ') : cats;
+              } catch {
+                return cats;
+              }
+            }
+            return null;
+          })(),
         }));
         
         setInspecciones(inspeccionesMapeadas);

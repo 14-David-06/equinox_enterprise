@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TABLES, INSPECCION_FIELDS } from '@/lib/airtable-config';
-import { getAirtableConfig } from '@/lib/airtable-config';
+import { TABLES, INSPECCION_FIELDS, getInspeccionesConfig } from '@/lib/airtable-config';
 import { verifyToken } from '@/lib/jwt';
 import { applyRateLimit } from '@/lib/rate-limit';
 import cookie from 'cookie';
 
-// Función auxiliar para fetch a Airtable
+// Función auxiliar para fetch a Airtable (usa la config de inspecciones)
 async function fetchAirtable(tableName: string, params?: Record<string, string>) {
-  const config = getAirtableConfig();
+  const config = getInspeccionesConfig();
   
   // Validar configuración antes de hacer la petición
   if (!config.API_KEY || !config.BASE_ID) {
-    throw new Error('Airtable no configurado: falta API_KEY o BASE_ID');
+    throw new Error('Airtable Inspecciones no configurado: falta API_KEY o BASE_ID');
   }
   
   let url = `${config.BASE_URL}/${config.BASE_ID}/${encodeURIComponent(tableName)}`;
@@ -45,9 +44,9 @@ async function fetchAirtable(tableName: string, params?: Record<string, string>)
   return response.json();
 }
 
-// Función para crear registro en Airtable
+// Función para crear registro en Airtable (usa la config de inspecciones)
 async function createAirtableRecord(tableName: string, fields: Record<string, any>) {
-  const config = getAirtableConfig();
+  const config = getInspeccionesConfig();
   const url = `${config.BASE_URL}/${config.BASE_ID}/${encodeURIComponent(tableName)}`;
 
   const response = await fetch(url, {
