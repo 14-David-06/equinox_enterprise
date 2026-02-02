@@ -65,10 +65,10 @@ const Navbar = () => {
           </li>
           <li>
             <Link 
-              href="/inspeccion" 
+              href="/preoperacional" 
               className="text-gray-300 hover:text-yellow-400 transition-colors duration-300 font-medium"
             >
-              Preoperacional
+              Pre-operacional
             </Link>
           </li>
           {user && (

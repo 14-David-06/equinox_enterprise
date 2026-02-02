@@ -8,17 +8,86 @@ interface Inspeccion {
   id: string;
   createdAt: string;
   updatedAt: string;
-  
-  // Encabezado
-  codigo?: string;
-  version?: string;
-  fechaEdicion?: string;
-  fechaInspeccionDesde?: string;
-  fechaInspeccionHasta?: string;
-  mes?: string;
-  anio?: string;
-  
+  // Metadatos
+  'Inspeccion ID'?: string;
+  'Fecha Creacion'?: string;
+  // Información del formato
+  'Codigo Formato'?: string;
+  'Version Formato'?: string;
+  'Fecha Edicion Formato'?: string;
+  'Fecha Inspeccion'?: string;
   // Documentos
+  'SOAT Cumple'?: boolean;
+  'SOAT Vencimiento'?: string;
+  'SOAT Observacion'?: string;
+  'Revision Tecnica Cumple'?: boolean;
+  'Revision Tecnica Vencimiento'?: string;
+  'Revision Tecnica Observacion'?: string;
+  'Poliza Cumple'?: boolean;
+  'Poliza Vencimiento'?: string;
+  'Poliza Observacion'?: string;
+  'Licencia Cumple'?: boolean;
+  'Licencia Vencimiento'?: string;
+  'Licencia Observacion'?: string;
+  // Categorías de licencia
+  'Categorias Licencia'?: string[];
+  'Vigencias Licencia'?: Record<string, string>;
+  // Conductor
+  'Nombre Conductor'?: string;
+  'Cedula'?: string;
+  'Edad'?: string;
+  'ARL'?: string;
+  'EPS'?: string;
+  'Fondo Pension'?: string;
+  'RH'?: string;
+  // Vehículo
+  'Placa Vehiculo'?: string;
+  'Marca Vehiculo'?: string;
+  'Linea Vehiculo'?: string;
+  'Modelo Vehiculo'?: string;
+  'Color Vehiculo'?: string;
+  'Tarjeta Propiedad'?: string;
+  // Remolque
+  'Placa Remolque'?: string;
+  'Marca Remolque'?: string;
+  'Clase Remolque'?: string;
+  'Modelo Remolque'?: string;
+  // Condiciones
+  'Horas Dormir'?: string;
+  'Items Verificacion'?: Record<number, { cumple: boolean | null; observacion: string }>;
+  'Desinfeccion'?: boolean;
+  'Descanso'?: boolean;
+  // Salud
+  'Toma Medicacion'?: string;
+  'Ansiedad Estres'?: string;
+  'Problemas Visuales'?: string;
+  'Estado Salud'?: string;
+  // Firmas
+  'Cedula Firma Conductor'?: string;
+  'Cedula Firma HSEQ'?: string;
+  // Estado
+  'Estado Inspeccion'?: string;
+
+  // Propiedades calculadas para compatibilidad con el código existente
+  nombreConductor?: string;
+  cedula?: string;
+  edad?: string;
+  rh?: string;
+  arl?: string;
+  eps?: string;
+  fondoPension?: string;
+  placaVehiculo?: string;
+  marcaVehiculo?: string;
+  lineaVehiculo?: string;
+  modeloVehiculo?: string;
+  placaRemolque?: string;
+  marcaRemolque?: string;
+  claseRemolque?: string;
+  horasDormir?: string;
+  tomaMedicacion?: string;
+  ansiedadEstres?: string;
+  problemasVisuales?: string;
+  estadoSalud?: string;
   soatEstado?: string;
   soatVencimiento?: string;
   revisionTecnicaEstado?: string;
@@ -28,35 +97,8 @@ interface Inspeccion {
   licenciaEstado?: string;
   licenciaVencimiento?: string;
   categorias?: string;
-  
-  // Conductor
-  nombreConductor?: string;
-  cedula?: string;
-  edad?: string;
-  arl?: string;
-  eps?: string;
-  fondoPension?: string;
-  rh?: string;
-  
-  // Vehículo
-  placaVehiculo?: string;
-  marcaVehiculo?: string;
-  lineaVehiculo?: string;
-  modeloVehiculo?: string;
-  
-  // Remolque
-  placaRemolque?: string;
-  marcaRemolque?: string;
-  claseRemolque?: string;
-  modeloRemolque?: string;
-  
-  // Salud y operación
-  horasDormir?: string;
-  kilometraje?: string;
-  tomaMedicacion?: string;
-  ansiedadEstres?: string;
-  problemasVisuales?: string;
-  estadoSalud?: string;
+  fechaInspeccionDesde?: string;
+  fechaInspeccionHasta?: string;
 }
 
 interface User {
@@ -119,8 +161,49 @@ export default function DashboardPage() {
         }
         
         const data = await res.json();
-        setInspecciones(data);
+        
+        // Mapear los datos de Airtable a las propiedades planas que espera el dashboard
+        const inspeccionesMapeadas = data.map((record: any) => ({
+          ...record,
+          // Propiedades del conductor
+          nombreConductor: record['Nombre Conductor'] || 'Sin nombre',
+          cedula: record['Cedula'] || 'Sin cédula',
+          edad: record['Edad'] || 'N/A',
+          rh: record['RH'] || 'N/A',
+          arl: record['ARL'] || 'N/A',
+          eps: record['EPS'] || 'N/A',
+          fondoPension: record['Fondo Pension'] || 'N/A',
+          // Propiedades del vehículo
+          placaVehiculo: record['Placa Vehiculo'] || 'Sin placa',
+          marcaVehiculo: record['Marca Vehiculo'] || 'N/A',
+          lineaVehiculo: record['Linea Vehiculo'] || 'N/A',
+          modeloVehiculo: record['Modelo Vehiculo'] || 'N/A',
+          // Propiedades del remolque
+          placaRemolque: record['Placa Remolque'] || null,
+          marcaRemolque: record['Marca Remolque'] || null,
+          claseRemolque: record['Clase Remolque'] || null,
+          // Condiciones de salud
+          horasDormir: record['Horas Dormir'] || null,
+          tomaMedicacion: record['Toma Medicacion'] || 'No',
+          ansiedadEstres: record['Ansiedad Estres'] || 'No',
+          problemasVisuales: record['Problemas Visuales'] || 'No',
+          estadoSalud: record['Estado Salud'] || 'Bueno',
+          // Estados de documentos
+          soatEstado: record['SOAT Cumple'] ? 'Vigente' : 'Vencido',
+          soatVencimiento: record['SOAT Vencimiento'] || null,
+          revisionTecnicaEstado: record['Revision Tecnica Cumple'] ? 'Vigente' : 'Vencido',
+          revisionTecnicaVencimiento: record['Revision Tecnica Vencimiento'] || null,
+          polizaEstado: record['Poliza Cumple'] ? 'Vigente' : 'Vencido',
+          polizaVencimiento: record['Poliza Vencimiento'] || null,
+          licenciaEstado: record['Licencia Cumple'] ? 'Vigente' : 'Vencido',
+          licenciaVencimiento: record['Licencia Vencimiento'] || null,
+          // Categorías
+          categorias: record['Categorias Licencia'] ? record['Categorias Licencia'].join(', ') : null,
+        }));
+        
+        setInspecciones(inspeccionesMapeadas);
       } catch (error) {
+        console.error('Error al cargar inspecciones:', error);
         // Error al cargar inspecciones - continuar con array vacío
       } finally {
         setLoading(false);

@@ -8,6 +8,12 @@ import cookie from 'cookie';
 // Función auxiliar para fetch a Airtable
 async function fetchAirtable(tableName: string, params?: Record<string, string>) {
   const config = getAirtableConfig();
+  
+  // Validar configuración antes de hacer la petición
+  if (!config.API_KEY || !config.BASE_ID) {
+    throw new Error('Airtable no configurado: falta API_KEY o BASE_ID');
+  }
+  
   let url = `${config.BASE_URL}/${config.BASE_ID}/${encodeURIComponent(tableName)}`;
   
   if (params) {
@@ -23,7 +29,17 @@ async function fetchAirtable(tableName: string, params?: Record<string, string>)
   });
 
   if (!response.ok) {
-    throw new Error(`Airtable error: ${response.status}`);
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData?.error?.message || `HTTP ${response.status}`;
+    
+    if (response.status === 403) {
+      throw new Error(`Airtable 403: Sin permiso para acceder a la tabla "${tableName}". Verifica que la tabla exista y que tu API key tenga acceso.`);
+    }
+    if (response.status === 404) {
+      throw new Error(`Airtable 404: Tabla "${tableName}" no encontrada. ¿Existe en tu base de datos?`);
+    }
+    
+    throw new Error(`Airtable error: ${response.status} - ${errorMessage}`);
   }
 
   return response.json();

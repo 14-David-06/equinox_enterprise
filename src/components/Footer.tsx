@@ -128,10 +128,12 @@ const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
-          <p>&copy; 2025 Equinox Transportation. Todos los derechos reservados.</p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
-            <Link href="#" className="hover:text-yellow-400 transition-colors">Política de Privacidad</Link>
-            <Link href="#" className="hover:text-yellow-400 transition-colors">Términos de Servicio</Link>
+          <p>&copy; 2026 Equinox Transportation. Todos los derechos reservados.</p>
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-4 md:mt-0">
+            <Link href="/legal" className="hover:text-yellow-400 transition-colors">Centro Legal</Link>
+            <Link href="/legal/politica-privacidad" className="hover:text-yellow-400 transition-colors">Privacidad</Link>
+            <Link href="/legal/terminos-condiciones" className="hover:text-yellow-400 transition-colors">Términos</Link>
+            <Link href="/legal/politica-cookies" className="hover:text-yellow-400 transition-colors">Cookies</Link>
           </div>
         </div>
       </div>

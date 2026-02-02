@@ -94,8 +94,8 @@ export default function LoginPage() {
         throw new Error(data.error || 'Error al iniciar sesión');
       }
 
-      // Login exitoso - redirigir al dashboard o página principal
-      router.push('/inspeccion');
+      // Login exitoso - redirigir al formulario pre-operacional
+      router.push('/preoperacional');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
     } finally {
@@ -140,8 +140,8 @@ export default function LoginPage() {
         throw new Error(data.error || 'Error al crear contraseña');
       }
 
-      // Login exitoso - redirigir al dashboard o página principal
-      router.push('/inspeccion');
+      // Login exitoso - redirigir al formulario pre-operacional
+      router.push('/preoperacional');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear contraseña');
     } finally {

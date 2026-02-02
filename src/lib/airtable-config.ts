@@ -9,7 +9,7 @@
  */
 
 // ===========================================
-// CONFIGURACIÓN PRINCIPAL
+// CONFIGURACIÓN PRINCIPAL - USUARIOS (Admin del sistema)
 // ===========================================
 
 export function getAirtableConfig() {
@@ -33,6 +33,63 @@ export function getAirtableConfig() {
   } as const;
 }
 
+// ===========================================
+// CONFIGURACIÓN - CONDUCTORES
+// ===========================================
+
+export function getConductoresConfig() {
+  const apiKey = process.env.AIRTABLE_CONDUCTORES_API_KEY || process.env.AIRTABLE_EQUINOX_USERS_CORE_API_KEY;
+  const baseId = process.env.AIRTABLE_CONDUCTORES_BASE_ID;
+  
+  if (!apiKey || !baseId) {
+    console.warn('⚠️ AIRTABLE CONDUCTORES: Credenciales no configuradas. Revisa las variables de entorno.');
+  }
+  
+  return {
+    API_KEY: apiKey || '',
+    BASE_ID: baseId || '',
+    BASE_URL: 'https://api.airtable.com/v0',
+  } as const;
+}
+
+// ===========================================
+// CONFIGURACIÓN - FLOTA (Vehículos y Remolques)
+// ===========================================
+
+export function getFlotaConfig() {
+  const apiKey = process.env.AIRTABLE_FLOTA_API_KEY || process.env.AIRTABLE_EQUINOX_USERS_CORE_API_KEY;
+  const baseId = process.env.AIRTABLE_FLOTA_BASE_ID;
+  
+  if (!apiKey || !baseId) {
+    console.warn('⚠️ AIRTABLE FLOTA: Credenciales no configuradas. Revisa las variables de entorno.');
+  }
+  
+  return {
+    API_KEY: apiKey || '',
+    BASE_ID: baseId || '',
+    BASE_URL: 'https://api.airtable.com/v0',
+  } as const;
+}
+
+// ===========================================
+// CONFIGURACIÓN - INSPECCIONES PREOPERACIONALES
+// ===========================================
+
+export function getInspeccionesConfig() {
+  const apiKey = process.env.AIRTABLE_INSPECCIONES_API_KEY || process.env.AIRTABLE_EQUINOX_USERS_CORE_API_KEY;
+  const baseId = process.env.AIRTABLE_INSPECCIONES_BASE_ID;
+  
+  if (!apiKey || !baseId) {
+    console.warn('⚠️ AIRTABLE INSPECCIONES: Credenciales no configuradas. Revisa las variables de entorno.');
+  }
+  
+  return {
+    API_KEY: apiKey || '',
+    BASE_ID: baseId || '',
+    BASE_URL: 'https://api.airtable.com/v0',
+  } as const;
+}
+
 export const AIRTABLE_CONFIG = getAirtableConfig();
 
 // ===========================================
@@ -41,18 +98,162 @@ export const AIRTABLE_CONFIG = getAirtableConfig();
 // ===========================================
 
 export const TABLES = {
+  // Base: Equinox Users Core
   USUARIOS: {
-    ID: process.env.AIRTABLE_EQUINOX_USERS_CORE_USUARIOS_TABLE_ID || '',
+    ID: process.env.AIRTABLE_USUARIOS_TABLE_ID || '',
     NAME: 'USUARIOS',
   },
   LOGS: {
-    ID: process.env.AIRTABLE_EQUINOX_USERS_CORE_LOGS_TABLE_ID || '',
+    ID: process.env.AIRTABLE_LOGS_TABLE_ID || '',
     NAME: 'LOGS',
   },
-  INSPECCIONES: {
-    ID: process.env.AIRTABLE_EQUINOX_USERS_CORE_INSPECCIONES_TABLE_ID || '',
-    NAME: 'INSPECCIONES',
+  // Base: Conductores Core
+  CONDUCTORES: {
+    ID: process.env.AIRTABLE_CONDUCTORES_TABLE_ID || '',
+    NAME: 'CONDUCTORES',
   },
+  // Base: Equinox Flota Core
+  VEHICULOS: {
+    ID: process.env.AIRTABLE_VEHICULOS_TABLE_ID || '',
+    NAME: 'VEHICULOS',
+  },
+  REMOLQUES: {
+    ID: process.env.AIRTABLE_REMOLQUES_TABLE_ID || '',
+    NAME: 'REMOLQUES',
+  },
+  // Base: Inspecciones Preoperacionales Core
+  INSPECCIONES_PREOPERACIONALES: {
+    ID: process.env.AIRTABLE_INSPECCIONES_TABLE_ID || '',
+    NAME: 'INSPECCIONES_PREOPERACIONALES',
+  },
+} as const;
+
+// ===========================================
+// CAMPOS DE LA TABLA CONDUCTORES
+// ===========================================
+
+export const CONDUCTOR_FIELDS = {
+  // Campos computados (solo lectura)
+  CONDUCTOR_ID: 'Conductor ID',
+  FECHA_REGISTRO: 'Fecha Registro',
+  ULTIMA_ACTUALIZACION: 'Ultima Actualizacion',
+  
+  // Campos editables
+  NOMBRE_COMPLETO: 'Nombre Completo',
+  CEDULA: 'Cedula',
+  TELEFONO: 'Telefono',
+  EMAIL: 'Email',
+  EDAD: 'Edad',
+  RH: 'RH',
+  EPS: 'EPS',
+  ARL: 'ARL',
+  FONDO_PENSION: 'Fondo Pension',
+  CATEGORIAS_LICENCIA: 'Categorias Licencia',
+  LICENCIA_VIGENTE: 'Licencia Vigente',
+  ESTADO: 'Estado',
+  ACEPTO_POLITICAS: 'Acepto Politicas',
+  ACEPTO_COOKIES: 'Acepto Cookies',
+  NOTAS_INTERNAS: 'Notas Internas',
+} as const;
+
+// ===========================================
+// CAMPOS DE LA TABLA VEHICULOS
+// ===========================================
+
+export const VEHICULO_FIELDS = {
+  VEHICULO_ID: 'Vehiculo ID',
+  PLACA: 'Placa',
+  TIPO: 'Tipo',
+  MARCA: 'Marca',
+  LINEA: 'Linea',
+  MODELO: 'Modelo',
+  COLOR: 'Color',
+  TARJETA_PROPIEDAD: 'Tarjeta Propiedad',
+  SOAT_VENCIMIENTO: 'SOAT Vencimiento',
+  RTM_VENCIMIENTO: 'RTM Vencimiento',
+  POLIZA_VENCIMIENTO: 'Poliza Vencimiento',
+  ESTADO: 'Estado',
+  KILOMETRAJE_ACTUAL: 'Kilometraje Actual',
+} as const;
+
+// ===========================================
+// CAMPOS DE LA TABLA REMOLQUES
+// ===========================================
+
+export const REMOLQUE_FIELDS = {
+  REMOLQUE_ID: 'Remolque ID',
+  PLACA: 'Placa',
+  MARCA: 'Marca',
+  CLASE: 'Clase',
+  MODELO: 'Modelo',
+  ESTADO: 'Estado',
+} as const;
+
+// ===========================================
+// CAMPOS DE LA TABLA INSPECCIONES_PREOPERACIONALES
+// ===========================================
+
+export const INSPECCION_PREOP_FIELDS = {
+  // Metadatos (solo lectura)
+  CODIGO_INSPECCION: 'Codigo Inspeccion',
+  INSPECCION_ID: 'Inspeccion ID',
+  FECHA_CREACION: 'Fecha Creacion',
+  
+  // Información del formato
+  FECHA_INSPECCION: 'Fecha Inspeccion',
+  CODIGO_FORMATO: 'Codigo Formato',
+  VERSION_FORMATO: 'Version Formato',
+  
+  // Conductor
+  CONDUCTOR_CEDULA: 'Conductor Cedula',
+  CONDUCTOR_NOMBRE: 'Conductor Nombre',
+  CONDUCTOR_TELEFONO: 'Conductor Telefono',
+  CONDUCTOR_EMAIL: 'Conductor Email',
+  
+  // Vehículo
+  VEHICULO_PLACA: 'Vehiculo Placa',
+  VEHICULO_MARCA: 'Vehiculo Marca',
+  VEHICULO_LINEA: 'Vehiculo Linea',
+  VEHICULO_MODELO: 'Vehiculo Modelo',
+  VEHICULO_COLOR: 'Vehiculo Color',
+  TARJETA_PROPIEDAD: 'Tarjeta Propiedad',
+  
+  // Remolque
+  REMOLQUE_PLACA: 'Remolque Placa',
+  REMOLQUE_MARCA: 'Remolque Marca',
+  REMOLQUE_CLASE: 'Remolque Clase',
+  REMOLQUE_MODELO: 'Remolque Modelo',
+  
+  // Documentos
+  SOAT_CUMPLE: 'SOAT Cumple',
+  SOAT_VENCIMIENTO: 'SOAT Vencimiento',
+  RTM_CUMPLE: 'RTM Cumple',
+  RTM_VENCIMIENTO: 'RTM Vencimiento',
+  POLIZA_CUMPLE: 'Poliza Cumple',
+  POLIZA_VENCIMIENTO: 'Poliza Vencimiento',
+  LICENCIA_CUMPLE: 'Licencia Cumple',
+  CATEGORIAS_LICENCIA: 'Categorias Licencia',
+  VIGENCIAS_LICENCIA: 'Vigencias Licencia',
+  
+  // GPS
+  GPS_NOMBRE: 'GPS Nombre',
+  GPS_USUARIO: 'GPS Usuario',
+  GPS_AUTORIZACION: 'GPS Autorizacion',
+  
+  // Condiciones
+  HORAS_DORMIR: 'Horas Dormir',
+  KILOMETRAJE_INICIAL: 'Kilometraje Inicial',
+  ITEMS_VERIFICACION: 'Items Verificacion',
+  ITEMS_NO_CUMPLEN: 'Items No Cumplen',
+  
+  // Firma y consentimiento
+  FIRMA_CONDUCTOR: 'Firma Conductor',
+  ACEPTO_POLITICAS: 'Acepto Politicas',
+  ACEPTO_COOKIES: 'Acepto Cookies',
+  
+  // Auditoría
+  IP_ORIGEN: 'IP Origen',
+  USER_AGENT: 'User Agent',
 } as const;
 
 // ===========================================
