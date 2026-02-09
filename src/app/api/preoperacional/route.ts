@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getInspeccionesConfig, getConductoresConfig, TABLES, INSPECCION_PREOP_FIELDS, CONDUCTOR_FIELDS } from '@/lib/airtable-config';
+import { generatePreoperacionalPDF } from '@/lib/pdf-generator';
+import { uploadPDFToCloudinary } from '@/lib/cloudinary';
 
 // ===========================================
 // FUNCIONES AUXILIARES PARA AIRTABLE
@@ -43,6 +45,26 @@ async function createAirtableRecord(baseId: string, tableName: string, apiKey: s
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(`Airtable error: ${response.status} - ${errorData?.error?.message || 'Unknown'}`);
+  }
+
+  return response.json();
+}
+
+async function updateAirtableRecord(baseId: string, tableName: string, apiKey: string, recordId: string, fields: Record<string, any>) {
+  const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}/${recordId}`;
+  
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ fields, typecast: true }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`Airtable update error: ${response.status} - ${errorData?.error?.message || 'Unknown'}`);
   }
 
   return response.json();
@@ -93,6 +115,7 @@ async function upsertConductor(conductorData: any) {
   if (searchData.records && searchData.records.length > 0) {
     // Actualizar conductor existente
     const recordId = searchData.records[0].id;
+    const codigoConductor = searchData.records[0].fields?.['Codigo Conductor'] || '';
     const updateUrl = `https://api.airtable.com/v0/${config.BASE_ID}/${TABLES.CONDUCTORES.NAME}/${recordId}`;
     
     await fetch(updateUrl, {
@@ -104,7 +127,7 @@ async function upsertConductor(conductorData: any) {
       body: JSON.stringify({ fields: conductorFields, typecast: true }),
     });
     
-    return { action: 'updated', recordId };
+    return { action: 'updated', recordId, codigoConductor };
   } else {
     // Crear nuevo conductor
     const createResponse = await createAirtableRecord(
@@ -114,7 +137,7 @@ async function upsertConductor(conductorData: any) {
       conductorFields
     );
     
-    return { action: 'created', recordId: createResponse.id };
+    return { action: 'created', recordId: createResponse.id, codigoConductor: createResponse.fields?.['Codigo Conductor'] || '' };
   }
 }
 
@@ -208,6 +231,7 @@ export async function POST(request: NextRequest) {
       // GPS
       [INSPECCION_PREOP_FIELDS.GPS_NOMBRE]: body.datosGPS?.nombreGPS || '',
       [INSPECCION_PREOP_FIELDS.GPS_USUARIO]: body.datosGPS?.usuario || '',
+      [INSPECCION_PREOP_FIELDS.GPS_PASSWORD]: body.datosGPS?.contrasena || '',
       [INSPECCION_PREOP_FIELDS.GPS_AUTORIZACION]: body.datosGPS?.autorizacionMonitoreo || false,
       
       // Condiciones
@@ -216,10 +240,12 @@ export async function POST(request: NextRequest) {
       [INSPECCION_PREOP_FIELDS.ITEMS_VERIFICACION]: JSON.stringify(body.itemsVerificacion || {}),
       [INSPECCION_PREOP_FIELDS.ITEMS_NO_CUMPLEN]: itemsNoCumplen,
       
-      // Firma y consentimiento
-      [INSPECCION_PREOP_FIELDS.FIRMA_CONDUCTOR]: body.firmaConductor || '',
+      // Consentimiento
       [INSPECCION_PREOP_FIELDS.ACEPTO_POLITICAS]: body.aceptoPoliticas || false,
       [INSPECCION_PREOP_FIELDS.ACEPTO_COOKIES]: body.aceptoCookies || false,
+      
+      // Referencia al conductor en base Conductores Core (Codigo Conductor: EQX-CON-XXXX)
+      [INSPECCION_PREOP_FIELDS.ID_CONDUCTOR]: conductorResult.codigoConductor,
       
       // Auditoría
       [INSPECCION_PREOP_FIELDS.IP_ORIGEN]: ipOrigen,
@@ -240,13 +266,82 @@ export async function POST(request: NextRequest) {
       inspeccionFields
     );
 
+    const codigoInspeccion = inspeccionResult.fields?.['Codigo Inspeccion'] || 'INSPEC-XXXX';
+
+    // 5. Generar PDF de la inspección
+    let pdfUrl = '';
+    try {
+      const pdfData = {
+        codigoInspeccion,
+        fecha: new Date().toISOString().split('T')[0],
+        codigoFormato: body.infoFormato?.codigo || 'HSEQ-FOR-065',
+        versionFormato: body.infoFormato?.version || '002',
+        conductor: body.conductor,
+        vehiculo: body.vehiculo,
+        remolque: body.remolque || {},
+        documentos: {
+          soatCumple: body.documentos?.soatCumple || false,
+          soatVencimiento: body.documentos?.soatVencimiento || '',
+          revisionCumple: body.documentos?.revisionCumple || false,
+          revisionVencimiento: body.documentos?.revisionVencimiento || '',
+          polizaCumple: body.documentos?.polizaCumple || false,
+          polizaVencimiento: body.documentos?.polizaVencimiento || '',
+          licenciaCumple: body.documentos?.licenciaCumple || false,
+          categoriasLicencia: body.documentos?.categoriasLicencia || [],
+          vigenciasLicencia: body.documentos?.vigenciasLicencia || {},
+        },
+        datosGPS: {
+          nombreGPS: body.datosGPS?.nombreGPS || '',
+          usuario: body.datosGPS?.usuario || '',
+          autorizacionMonitoreo: body.datosGPS?.autorizacionMonitoreo || false,
+        },
+        horasDormir: body.horasDormir || '0',
+        kilometrajeInicial: body.kilometrajeInicial || '0',
+        itemsVerificacion: body.itemsVerificacion || {},
+        itemsNoCumplen,
+        firmaConductor: body.firmaConductor || '',
+        idConductor: conductorResult.codigoConductor,
+        ipOrigen,
+      };
+
+      const pdfBuffer = await generatePreoperacionalPDF(pdfData);
+
+      // 6. Subir PDF a Cloudinary
+      const fileName = `${codigoInspeccion}_${body.conductor.cedula}_${new Date().toISOString().split('T')[0]}`;
+      const cloudinaryResult = await uploadPDFToCloudinary(pdfBuffer, fileName);
+      pdfUrl = cloudinaryResult.secure_url;
+
+      // 7. Actualizar registro de inspección con el PDF y estado
+      console.log(`📎 Adjuntando PDF a Airtable record ${inspeccionResult.id}...`);
+      console.log(`   URL: ${pdfUrl}`);
+      console.log(`   Campo: ${INSPECCION_PREOP_FIELDS.DOC_PREOPERACIONAL}`);
+      
+      const updateResult = await updateAirtableRecord(
+        inspeccionConfig.BASE_ID,
+        TABLES.INSPECCIONES_PREOPERACIONALES.NAME,
+        inspeccionConfig.API_KEY,
+        inspeccionResult.id,
+        {
+          [INSPECCION_PREOP_FIELDS.DOC_PREOPERACIONAL]: [{ url: pdfUrl, filename: `${fileName}.pdf` }],
+          [INSPECCION_PREOP_FIELDS.ESTADO_PREOPERACIONAL]: 'Solicitado',
+        }
+      );
+
+      console.log(`✅ PDF generado y subido: ${pdfUrl}`);
+      console.log(`✅ Airtable actualizado:`, JSON.stringify(updateResult?.fields?.['Doc Preoperacional'] || updateResult?.fields?.['Estado Preoperacional'] || 'OK'));
+    } catch (pdfError) {
+      console.error('⚠️ Error generando/subiendo PDF (la inspección se registró correctamente):', pdfError);
+      // No fallar la inspección si el PDF falla - se puede regenerar después
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Inspección preoperacional registrada correctamente',
       data: {
         inspeccionId: inspeccionResult.id,
-        codigoInspeccion: inspeccionResult.fields?.['Codigo Inspeccion'],
+        codigoInspeccion,
         conductorAction: conductorResult.action,
+        pdfUrl: pdfUrl || undefined,
       }
     }, { status: 201 });
 

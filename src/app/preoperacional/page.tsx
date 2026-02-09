@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
@@ -156,12 +156,23 @@ export default function PreoperacionalPage() {
   const [aceptoPoliticas, setAceptoPoliticas] = useState(false);
   const [aceptoCookies, setAceptoCookies] = useState(false);
 
+  // Estados para campos "Otra" personalizados
+  const [epsOtra, setEpsOtra] = useState('');
+  const [arlOtra, setArlOtra] = useState('');
+  const [fondoPensionOtra, setFondoPensionOtra] = useState('');
+
+  // Refs y estados para el canvas de firma
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasFirma, setHasFirma] = useState(false);
+
   const [datosGPS, setDatosGPS] = useState<DatosGPS>({
     nombreGPS: '',
     usuario: '',
     contrasena: '',
     autorizacionMonitoreo: false,
   });
+
 
   useEffect(() => {
     const datosGuardadosStr = localStorage.getItem(STORAGE_KEY);
@@ -223,6 +234,92 @@ export default function PreoperacionalPage() {
     setVigenciasLicencia(prev => ({ ...prev, [categoria]: fecha }));
   };
 
+  // ==========================================
+  // FUNCIONES PARA EL CANVAS DE FIRMA
+  // ==========================================
+  
+  const getCanvasContext = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    }
+    return ctx;
+  };
+
+  const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    if ('touches' in e) {
+      const touch = e.touches[0];
+      return {
+        x: (touch.clientX - rect.left) * scaleX,
+        y: (touch.clientY - rect.top) * scaleY
+      };
+    } else {
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const ctx = getCanvasContext();
+    if (!ctx) return;
+    
+    setIsDrawing(true);
+    const { x, y } = getCoordinates(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    
+    const ctx = getCanvasContext();
+    if (!ctx) return;
+    
+    const { x, y } = getCoordinates(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    setHasFirma(true);
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    
+    // Guardar la firma como base64
+    const canvas = canvasRef.current;
+    if (canvas && hasFirma) {
+      const dataUrl = canvas.toDataURL('image/png');
+      setFirmaConductor(dataUrl);
+    }
+  };
+
+  const limpiarFirma = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    setHasFirma(false);
+    setFirmaConductor('');
+  };
+
   const validarFormulario = (): boolean => {
     if (!conductor.nombreCompleto || !conductor.cedula) {
       alert('Por favor complete los datos del conductor (nombre y cédula son obligatorios)');
@@ -242,6 +339,10 @@ export default function PreoperacionalPage() {
     }
     if (!datosGPS.autorizacionMonitoreo) {
       alert('Debe autorizar el uso de los datos del GPS para monitoreo del servicio');
+      return false;
+    }
+    if (!hasFirma || !firmaConductor) {
+      alert('Debe firmar el formulario antes de enviarlo');
       return false;
     }
     if (!aceptoPoliticas) {
@@ -313,6 +414,7 @@ export default function PreoperacionalPage() {
       setVigenciasLicencia({});
       setAceptoPoliticas(false);
       setAceptoCookies(false);
+      limpiarFirma();
       setDatosGPS({
         nombreGPS: '',
         usuario: '',
@@ -451,19 +553,144 @@ export default function PreoperacionalPage() {
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">RH</label>
-                  <input type="text" value={conductor.rh} onChange={(e) => setConductor(prev => ({ ...prev, rh: e.target.value }))} className="w-full px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors" placeholder="Tipo de sangre" />
+                  <select 
+                    value={conductor.rh} 
+                    onChange={(e) => setConductor(prev => ({ ...prev, rh: e.target.value }))} 
+                    className="w-full px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  >
+                    <option value="" className="bg-slate-800">Seleccionar</option>
+                    <option value="O+" className="bg-slate-800">O+</option>
+                    <option value="O-" className="bg-slate-800">O-</option>
+                    <option value="A+" className="bg-slate-800">A+</option>
+                    <option value="A-" className="bg-slate-800">A-</option>
+                    <option value="B+" className="bg-slate-800">B+</option>
+                    <option value="B-" className="bg-slate-800">B-</option>
+                    <option value="AB+" className="bg-slate-800">AB+</option>
+                    <option value="AB-" className="bg-slate-800">AB-</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">EPS</label>
-                  <input type="text" value={conductor.eps} onChange={(e) => setConductor(prev => ({ ...prev, eps: e.target.value }))} className="w-full px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors" placeholder="EPS" />
+                  <select 
+                    value={conductor.eps === 'Otra' || (!['', 'Sura EPS', 'Nueva EPS', 'Sanitas', 'Compensar', 'Famisanar', 'Salud Total', 'Coomeva EPS', 'Medimás', 'Aliansalud', 'Comfenalco Valle', 'SOS EPS', 'Mutual Ser', 'Coosalud', 'Emssanar', 'Asmet Salud', 'Cajacopi', 'Capital Salud', 'Savia Salud'].includes(conductor.eps) && conductor.eps) ? 'Otra' : conductor.eps} 
+                    onChange={(e) => {
+                      if (e.target.value === 'Otra') {
+                        setConductor(prev => ({ ...prev, eps: 'Otra' }));
+                      } else {
+                        setConductor(prev => ({ ...prev, eps: e.target.value }));
+                        setEpsOtra('');
+                      }
+                    }} 
+                    className="w-full px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  >
+                    <option value="" className="bg-slate-800">Seleccionar EPS</option>
+                    <option value="Sura EPS" className="bg-slate-800">Sura EPS</option>
+                    <option value="Nueva EPS" className="bg-slate-800">Nueva EPS</option>
+                    <option value="Sanitas" className="bg-slate-800">Sanitas</option>
+                    <option value="Compensar" className="bg-slate-800">Compensar</option>
+                    <option value="Famisanar" className="bg-slate-800">Famisanar</option>
+                    <option value="Salud Total" className="bg-slate-800">Salud Total</option>
+                    <option value="Coomeva EPS" className="bg-slate-800">Coomeva EPS</option>
+                    <option value="Medimás" className="bg-slate-800">Medimás</option>
+                    <option value="Aliansalud" className="bg-slate-800">Aliansalud</option>
+                    <option value="Comfenalco Valle" className="bg-slate-800">Comfenalco Valle</option>
+                    <option value="SOS EPS" className="bg-slate-800">SOS EPS</option>
+                    <option value="Mutual Ser" className="bg-slate-800">Mutual Ser</option>
+                    <option value="Coosalud" className="bg-slate-800">Coosalud</option>
+                    <option value="Emssanar" className="bg-slate-800">Emssanar</option>
+                    <option value="Asmet Salud" className="bg-slate-800">Asmet Salud</option>
+                    <option value="Cajacopi" className="bg-slate-800">Cajacopi</option>
+                    <option value="Capital Salud" className="bg-slate-800">Capital Salud</option>
+                    <option value="Savia Salud" className="bg-slate-800">Savia Salud</option>
+                    <option value="Otra" className="bg-slate-800">Otra</option>
+                  </select>
+                  {(conductor.eps === 'Otra' || (!['', 'Sura EPS', 'Nueva EPS', 'Sanitas', 'Compensar', 'Famisanar', 'Salud Total', 'Coomeva EPS', 'Medimás', 'Aliansalud', 'Comfenalco Valle', 'SOS EPS', 'Mutual Ser', 'Coosalud', 'Emssanar', 'Asmet Salud', 'Cajacopi', 'Capital Salud', 'Savia Salud'].includes(conductor.eps) && conductor.eps)) && (
+                    <input 
+                      type="text" 
+                      value={conductor.eps === 'Otra' ? epsOtra : conductor.eps}
+                      onChange={(e) => {
+                        setEpsOtra(e.target.value);
+                        setConductor(prev => ({ ...prev, eps: e.target.value || 'Otra' }));
+                      }}
+                      placeholder="Especificar EPS"
+                      className="w-full mt-2 px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">ARL</label>
-                  <input type="text" value={conductor.arl} onChange={(e) => setConductor(prev => ({ ...prev, arl: e.target.value }))} className="w-full px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors" placeholder="ARL" />
+                  <select 
+                    value={conductor.arl === 'Otra' || (!['', 'Sura ARL', 'Positiva ARL', 'Colmena Seguros', 'Seguros Bolívar ARL', 'AXA Colpatria ARL', 'Liberty Seguros ARL', 'Alfa ARL', 'Aurora ARL', 'Equidad Seguros ARL'].includes(conductor.arl) && conductor.arl) ? 'Otra' : conductor.arl}
+                    onChange={(e) => {
+                      if (e.target.value === 'Otra') {
+                        setConductor(prev => ({ ...prev, arl: 'Otra' }));
+                      } else {
+                        setConductor(prev => ({ ...prev, arl: e.target.value }));
+                        setArlOtra('');
+                      }
+                    }} 
+                    className="w-full px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  >
+                    <option value="" className="bg-slate-800">Seleccionar ARL</option>
+                    <option value="Sura ARL" className="bg-slate-800">Sura ARL</option>
+                    <option value="Positiva ARL" className="bg-slate-800">Positiva ARL</option>
+                    <option value="Colmena Seguros" className="bg-slate-800">Colmena Seguros</option>
+                    <option value="Seguros Bolívar ARL" className="bg-slate-800">Seguros Bolívar ARL</option>
+                    <option value="AXA Colpatria ARL" className="bg-slate-800">AXA Colpatria ARL</option>
+                    <option value="Liberty Seguros ARL" className="bg-slate-800">Liberty Seguros ARL</option>
+                    <option value="Alfa ARL" className="bg-slate-800">Alfa ARL</option>
+                    <option value="Aurora ARL" className="bg-slate-800">Aurora ARL</option>
+                    <option value="Equidad Seguros ARL" className="bg-slate-800">Equidad Seguros ARL</option>
+                    <option value="Otra" className="bg-slate-800">Otra</option>
+                  </select>
+                  {(conductor.arl === 'Otra' || (!['', 'Sura ARL', 'Positiva ARL', 'Colmena Seguros', 'Seguros Bolívar ARL', 'AXA Colpatria ARL', 'Liberty Seguros ARL', 'Alfa ARL', 'Aurora ARL', 'Equidad Seguros ARL'].includes(conductor.arl) && conductor.arl)) && (
+                    <input 
+                      type="text" 
+                      value={conductor.arl === 'Otra' ? arlOtra : conductor.arl}
+                      onChange={(e) => {
+                        setArlOtra(e.target.value);
+                        setConductor(prev => ({ ...prev, arl: e.target.value || 'Otra' }));
+                      }}
+                      placeholder="Especificar ARL"
+                      className="w-full mt-2 px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Fondo de Pensión</label>
-                  <input type="text" value={conductor.fondoPension} onChange={(e) => setConductor(prev => ({ ...prev, fondoPension: e.target.value }))} className="w-full px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors" placeholder="Fondo de pensión" />
+                  <select 
+                    value={conductor.fondoPension === 'Otra' || (!['', 'Porvenir', 'Protección', 'Colfondos', 'Skandia', 'Old Mutual', 'Colpensiones'].includes(conductor.fondoPension) && conductor.fondoPension) ? 'Otra' : conductor.fondoPension}
+                    onChange={(e) => {
+                      if (e.target.value === 'Otra') {
+                        setConductor(prev => ({ ...prev, fondoPension: 'Otra' }));
+                      } else {
+                        setConductor(prev => ({ ...prev, fondoPension: e.target.value }));
+                        setFondoPensionOtra('');
+                      }
+                    }} 
+                    className="w-full px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                  >
+                    <option value="" className="bg-slate-800">Seleccionar Fondo</option>
+                    <option value="Porvenir" className="bg-slate-800">Porvenir</option>
+                    <option value="Protección" className="bg-slate-800">Protección</option>
+                    <option value="Colfondos" className="bg-slate-800">Colfondos</option>
+                    <option value="Skandia" className="bg-slate-800">Skandia</option>
+                    <option value="Old Mutual" className="bg-slate-800">Old Mutual</option>
+                    <option value="Colpensiones" className="bg-slate-800">Colpensiones</option>
+                    <option value="Otra" className="bg-slate-800">Otra</option>
+                  </select>
+                  {(conductor.fondoPension === 'Otra' || (!['', 'Porvenir', 'Protección', 'Colfondos', 'Skandia', 'Old Mutual', 'Colpensiones'].includes(conductor.fondoPension) && conductor.fondoPension)) && (
+                    <input 
+                      type="text" 
+                      value={conductor.fondoPension === 'Otra' ? fondoPensionOtra : conductor.fondoPension}
+                      onChange={(e) => {
+                        setFondoPensionOtra(e.target.value);
+                        setConductor(prev => ({ ...prev, fondoPension: e.target.value || 'Otra' }));
+                      }}
+                      placeholder="Especificar Fondo de Pensión"
+                      className="w-full mt-2 px-3 sm:px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-400 transition-colors"
+                    />
+                  )}
                 </div>
               </div>
             </section>
@@ -690,12 +917,59 @@ export default function PreoperacionalPage() {
             <section className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6">
               <h2 className="text-xl sm:text-2xl font-bold text-yellow-400 mb-4 sm:mb-6">✍️ Firma del Conductor</h2>
               <div className="bg-white/5 p-6 rounded-xl border border-white/10">
-                <p className="text-gray-400 mb-4 text-sm">Al firmar, certifico que toda la información proporcionada es veraz y que he realizado la inspección pre-operacional del vehículo antes de iniciar la jornada.</p>
-                <input type="text" value={firmaConductor} onChange={(e) => setFirmaConductor(e.target.value)} placeholder="Escriba su nombre completo como firma" className="w-full px-4 py-3 bg-white/5 border-2 border-dashed border-white/20 rounded-xl text-white text-center text-lg italic focus:outline-none focus:border-yellow-400 transition-colors" />
-                {conductor.nombreCompleto && firmaConductor !== conductor.nombreCompleto && (
-                  <button type="button" onClick={() => setFirmaConductor(conductor.nombreCompleto)} className="mt-3 text-sm text-yellow-400 hover:text-yellow-300 transition-colors">
-                    📝 Usar mi nombre: {conductor.nombreCompleto}
+                <p className="text-gray-400 mb-4 text-sm">
+                  Al firmar, certifico que toda la información proporcionada es veraz y que he realizado la inspección pre-operacional del vehículo antes de iniciar la jornada.
+                </p>
+                
+                {/* Canvas de firma */}
+                <div className="relative">
+                  <canvas
+                    ref={canvasRef}
+                    width={600}
+                    height={200}
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                    className="w-full bg-white border-2 border-dashed border-gray-300 rounded-xl cursor-crosshair touch-none"
+                    style={{ maxHeight: '200px' }}
+                  />
+                  
+                  {!hasFirma && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <p className="text-gray-400 text-lg">Firme aquí con el dedo o mouse</p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Botón para limpiar */}
+                <div className="flex items-center justify-between mt-4">
+                  <div className="flex items-center gap-2">
+                    {hasFirma && (
+                      <span className="text-green-400 text-sm flex items-center gap-1">
+                        ✓ Firma registrada
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={limpiarFirma}
+                    className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-sm flex items-center gap-2"
+                  >
+                    🗑️ Limpiar firma
                   </button>
+                </div>
+                
+                {/* Nombre del conductor */}
+                {conductor.nombreCompleto && (
+                  <p className="mt-4 text-center text-gray-400 text-sm border-t border-white/10 pt-4">
+                    <span className="font-semibold text-white">{conductor.nombreCompleto}</span>
+                    <br />
+                    C.C. {conductor.cedula}
+                  </p>
                 )}
               </div>
             </section>

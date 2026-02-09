@@ -238,6 +238,7 @@ export const INSPECCION_PREOP_FIELDS = {
   // GPS
   GPS_NOMBRE: 'GPS Nombre',
   GPS_USUARIO: 'GPS Usuario',
+  GPS_PASSWORD: 'GPS Password',
   GPS_AUTORIZACION: 'GPS Autorizacion',
   
   // Condiciones
@@ -251,9 +252,22 @@ export const INSPECCION_PREOP_FIELDS = {
   ACEPTO_POLITICAS: 'Acepto Politicas',
   ACEPTO_COOKIES: 'Acepto Cookies',
   
+  // Referencia al conductor
+  ID_CONDUCTOR: 'ID Conductor',
+  
   // Auditoría
   IP_ORIGEN: 'IP Origen',
   USER_AGENT: 'User Agent',
+  
+  // Documento y estado
+  DOC_PREOPERACIONAL: 'Doc Preoperacional',
+  ESTADO_PREOPERACIONAL: 'Estado Preoperacional',
+  
+  // Revisión HSEQ
+  FIRMA_HSEQ: 'Firma HSEQ',
+  NOMBRE_HSEQ: 'Nombre HSEQ',
+  FECHA_REVISION: 'Fecha Revision',
+  OBSERVACIONES_REVISION: 'Observaciones Revision',
 } as const;
 
 // ===========================================
