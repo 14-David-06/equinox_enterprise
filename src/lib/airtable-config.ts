@@ -134,6 +134,7 @@ export const TABLES = {
 
 export const CONDUCTOR_FIELDS = {
   // Campos computados (solo lectura)
+  CODIGO_CONDUCTOR: 'Codigo Conductor',
   CONDUCTOR_ID: 'Conductor ID',
   FECHA_REGISTRO: 'Fecha Registro',
   ULTIMA_ACTUALIZACION: 'Ultima Actualizacion',
@@ -143,6 +144,13 @@ export const CONDUCTOR_FIELDS = {
   CEDULA: 'Cedula',
   TELEFONO: 'Telefono',
   EMAIL: 'Email',
+  
+  // Campos de GPS
+  GPS_NOMBRE: 'GPS Nombre',
+  GPS_USUARIO: 'GPS Usuario',
+  GPS_PASSWORD: 'GPS Password',
+  
+  // Campos personales
   EDAD: 'Edad',
   RH: 'RH',
   EPS: 'EPS',
@@ -234,12 +242,6 @@ export const INSPECCION_PREOP_FIELDS = {
   LICENCIA_CUMPLE: 'Licencia Cumple',
   CATEGORIAS_LICENCIA: 'Categorias Licencia',
   VIGENCIAS_LICENCIA: 'Vigencias Licencia',
-  
-  // GPS
-  GPS_NOMBRE: 'GPS Nombre',
-  GPS_USUARIO: 'GPS Usuario',
-  GPS_PASSWORD: 'GPS Password',
-  GPS_AUTORIZACION: 'GPS Autorizacion',
   
   // Condiciones
   HORAS_DORMIR: 'Horas Dormir',

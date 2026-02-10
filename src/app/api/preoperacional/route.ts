@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getInspeccionesConfig, getConductoresConfig, TABLES, INSPECCION_PREOP_FIELDS, CONDUCTOR_FIELDS } from '@/lib/airtable-config';
 import { generatePreoperacionalPDF } from '@/lib/pdf-generator';
 import { uploadPDFToCloudinary } from '@/lib/cloudinary';
+import { encrypt } from '@/lib/encryption';
 
 // ===========================================
 // FUNCIONES AUXILIARES PARA AIRTABLE
@@ -103,6 +104,10 @@ async function upsertConductor(conductorData: any) {
     [CONDUCTOR_FIELDS.ACEPTO_POLITICAS]: conductorData.aceptoPoliticas || false,
     [CONDUCTOR_FIELDS.ACEPTO_COOKIES]: conductorData.aceptoCookies || false,
     [CONDUCTOR_FIELDS.ESTADO]: 'Activo',
+    // Campos de GPS (contraseña encriptada)
+    [CONDUCTOR_FIELDS.GPS_NOMBRE]: conductorData.gpsNombre || undefined,
+    [CONDUCTOR_FIELDS.GPS_USUARIO]: conductorData.gpsUsuario || undefined,
+    [CONDUCTOR_FIELDS.GPS_PASSWORD]: conductorData.gpsPassword ? encrypt(conductorData.gpsPassword) : undefined,
   } as Record<string, unknown>;
 
   // Limpiar campos undefined
@@ -171,11 +176,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Upsert del conductor en la base de conductores
+    // 1. Upsert del conductor en la base de conductores (incluye datos GPS)
     const conductorResult = await upsertConductor({
       ...body.conductor,
       aceptoPoliticas: body.aceptoPoliticas,
       aceptoCookies: body.aceptoCookies,
+      gpsNombre: body.datosGPS?.nombreGPS || '',
+      gpsUsuario: body.datosGPS?.usuario || '',
+      gpsPassword: body.datosGPS?.contrasena || '',
     });
 
     // 2. Obtener información de auditoría
@@ -227,12 +235,6 @@ export async function POST(request: NextRequest) {
       [INSPECCION_PREOP_FIELDS.LICENCIA_CUMPLE]: body.documentos?.licenciaCumple || false,
       [INSPECCION_PREOP_FIELDS.CATEGORIAS_LICENCIA]: JSON.stringify(body.documentos?.categoriasLicencia || []),
       [INSPECCION_PREOP_FIELDS.VIGENCIAS_LICENCIA]: JSON.stringify(body.documentos?.vigenciasLicencia || {}),
-      
-      // GPS
-      [INSPECCION_PREOP_FIELDS.GPS_NOMBRE]: body.datosGPS?.nombreGPS || '',
-      [INSPECCION_PREOP_FIELDS.GPS_USUARIO]: body.datosGPS?.usuario || '',
-      [INSPECCION_PREOP_FIELDS.GPS_PASSWORD]: body.datosGPS?.contrasena || '',
-      [INSPECCION_PREOP_FIELDS.GPS_AUTORIZACION]: body.datosGPS?.autorizacionMonitoreo || false,
       
       // Condiciones
       [INSPECCION_PREOP_FIELDS.HORAS_DORMIR]: body.horasDormir ? parseFloat(body.horasDormir) : undefined,
