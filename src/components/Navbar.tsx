@@ -7,20 +7,26 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<{ nombre?: string; cedula?: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Marcar como montado para evitar problemas de hidratación
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     // comprobar sesión actual
-    let mounted = true;
+    let isMounted = true;
     (async () => {
       try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
         const data = await res.json();
-        if (mounted && data?.authenticated) setUser(data.user);
-      } catch (err) {
+        if (isMounted && data?.authenticated) setUser(data.user);
+      } catch {
         // ignore
       }
     })();
-    return () => { mounted = false; };
+    return () => { isMounted = false; };
   }, []);
 
   useEffect(() => {
@@ -56,27 +62,69 @@ const Navbar = () => {
 
   const closeMenu = () => setMobileMenuOpen(false);
 
-  return (
-    <>
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled || mobileMenuOpen
-          ? 'backdrop-blur-xl bg-slate-900/95 border-b border-white/10 shadow-2xl' 
-          : 'backdrop-blur-md bg-slate-900/80'
-      }`}>
+  // No renderizar hasta que esté montado para evitar problemas de hidratación
+  if (!mounted) {
+    return (
+      <nav 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 50,
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
         <div className="container mx-auto flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4">
-          {/* Logo */}
-          <Link href="/" className="flex items-center group z-50" onClick={closeMenu}>
+          <Link href="/" className="flex items-center">
             <Image
               src="/logo-equinos-blanco-2-removebg-preview.png"
               alt="Logo Equinox"
               width={80}
               height={80}
+              priority
+              className="w-[80px] sm:w-[100px] xl:w-[140px]"
+            />
+          </Link>
+          <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 xl:hidden" />
+        </div>
+      </nav>
+    );
+  }
+
+  return (
+    <>
+      <nav 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 50,
+          backgroundColor: scrolled || mobileMenuOpen ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: scrolled ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+          transition: 'all 0.3s ease',
+        }}
+      >
+        <div className="container mx-auto flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4">
+          {/* Logo */}
+          <Link href="/" className="flex items-center group" style={{ zIndex: 51 }} onClick={closeMenu}>
+            <Image
+              src="/logo-equinos-blanco-2-removebg-preview.png"
+              alt="Logo Equinox"
+              width={80}
+              height={80}
+              priority
               className="w-[80px] sm:w-[100px] xl:w-[140px] group-hover:scale-105 transition-transform duration-300"
             />
           </Link>
 
-          {/* Menú Desktop */}
-          <ul className="hidden xl:flex space-x-5 2xl:space-x-8 items-center">
+          {/* Menú Desktop - Solo visible en xl (1280px+) */}
+          <ul className="hidden xl:flex items-center space-x-5 2xl:space-x-8">
             <li>
               <Link 
                 href="#services" 
@@ -137,38 +185,67 @@ const Navbar = () => {
             </li>
           </ul>
 
-          {/* Botón Hamburguesa - Móvil/Tablet */}
+          {/* Botón Hamburguesa - Solo visible en móvil/tablet (< 1280px) */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="xl:hidden z-50 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+            style={{ zIndex: 51 }}
+            className="xl:hidden w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
             aria-label="Menú"
           >
-            <span className={`w-5 h-0.5 bg-white rounded transition-all duration-300 ${mobileMenuOpen ? 'rotate-45 translate-y-2' : ''}`} />
-            <span className={`w-5 h-0.5 bg-white rounded transition-all duration-300 ${mobileMenuOpen ? 'opacity-0' : ''}`} />
-            <span className={`w-5 h-0.5 bg-white rounded transition-all duration-300 ${mobileMenuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+            <span 
+              className="w-5 h-0.5 bg-white rounded transition-all duration-300"
+              style={{ transform: mobileMenuOpen ? 'rotate(45deg) translateY(8px)' : 'none' }}
+            />
+            <span 
+              className="w-5 h-0.5 bg-white rounded transition-all duration-300"
+              style={{ opacity: mobileMenuOpen ? 0 : 1 }}
+            />
+            <span 
+              className="w-5 h-0.5 bg-white rounded transition-all duration-300"
+              style={{ transform: mobileMenuOpen ? 'rotate(-45deg) translateY(-8px)' : 'none' }}
+            />
           </button>
         </div>
       </nav>
 
       {/* Menú Móvil Overlay */}
       <div 
-        className={`fixed inset-0 z-40 xl:hidden transition-all duration-300 ${
-          mobileMenuOpen ? 'visible' : 'invisible'
-        }`}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 40,
+          visibility: mobileMenuOpen ? 'visible' : 'hidden',
+          transition: 'visibility 0.3s',
+        }}
+        className="xl:hidden"
       >
         {/* Backdrop */}
         <div 
-          className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
-            mobileMenuOpen ? 'opacity-100' : 'opacity-0'
-          }`}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            opacity: mobileMenuOpen ? 1 : 0,
+            transition: 'opacity 0.3s',
+          }}
           onClick={closeMenu}
         />
         
         {/* Panel del Menú */}
         <div 
-          className={`absolute top-0 right-0 h-full w-[280px] bg-gradient-to-b from-slate-900 to-black border-l border-white/10 shadow-2xl transition-transform duration-300 ease-out ${
-            mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
-          }`}
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            height: '100%',
+            width: '280px',
+            background: 'linear-gradient(to bottom, rgb(15, 23, 42), rgb(0, 0, 0))',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.5)',
+            transform: mobileMenuOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease-out',
+          }}
         >
           <div className="flex flex-col h-full pt-20 pb-8 px-6">
             {/* Links de navegación */}
