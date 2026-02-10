@@ -1,4 +1,5 @@
 'use client';
+// Force redeploy v2 - Production navbar fix
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
