@@ -14,15 +14,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Run gitleaks action (detect secrets)
-        uses: zricethezav/gitleaks-action@v2
-        with:
-          args: detect --source . --report-format json --exit-code 1
-
-      - name: Upload gitleaks report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gitleaks-report
-          path: gitleaks-report.json
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml

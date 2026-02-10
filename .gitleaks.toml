@@ -1,5 +1,8 @@
 title = "gitleaks config for equinox_enterprise"
 
+[extend]
+useDefault = true
+
 [[rules]]
 id = "aws-access-key"
 description = "AWS Access Key"
@@ -40,15 +43,23 @@ regexes = [
     # Test/example values
     '''(example|test|dummy)''',
     '''dev_secret_min_32_chars_local_only''',
+    # Redacted placeholders in history
+    '''<REDACTED.*>''',
+    '''REDACTED_IN_REPO''',
+    # Turso URL (not a secret, just a database URL)
+    '''libsql://.*\.turso\.io''',
 ]
 
-files = [
+paths = [
     '''.gitleaksignore''',
     '''.env.example''',
     '''leaks.json''',
-    '''node_modules/''',
-    '''.git/''',
-    '''.next/''',
-    '''dist/''',
-    '''build/''',
+    '''node_modules/**''',
+    '''.git/**''',
+    '''.next/**''',
+    '''dist/**''',
+    '''build/**''',
+    '''.env''',
+    '''.env.local''',
+    '''.env.*.local''',
 ]
