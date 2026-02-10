@@ -51,15 +51,15 @@ regexes = [
 ]
 
 paths = [
-    '''.gitleaksignore''',
-    '''.env.example''',
-    '''leaks.json''',
-    '''node_modules/**''',
-    '''.git/**''',
-    '''.next/**''',
-    '''dist/**''',
-    '''build/**''',
-    '''.env''',
-    '''.env.local''',
-    '''.env.*.local''',
+    '''^\.gitleaksignore$''',
+    '''^\.env\.example$''',
+    '''leaks\.json$''',
+    '''^node_modules/''',
+    '''^\.git/''',
+    '''^\.next/''',
+    '''^dist/''',
+    '''^build/''',
+    '''^\.env$''',
+    '''^\.env\.local$''',
+    '''\.env\..*\.local$''',
 ]
