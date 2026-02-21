@@ -21,7 +21,7 @@ export default function TratamientoDatos() {
           <h2 className="text-xl font-semibold text-white mb-3">1. Identificación del Responsable</h2>
           <p>
             <strong className="text-yellow-400">EQUINOX LOGÍSTICA Y TRANSPORTE S.A.S.</strong>, sociedad comercial 
-            identificada con NIT [NÚMERO DE NIT], con domicilio principal en [DIRECCIÓN], Colombia, 
+            identificada con NIT 901.870.510-5, con domicilio principal en Cll 12 Cra 4 #78, Colombia, 
             actuará como responsable del tratamiento de los datos personales que usted proporcione.
           </p>
         </div>
@@ -166,9 +166,9 @@ export default function TratamientoDatos() {
             Para ejercer sus derechos, puede contactarnos a través de:
           </p>
           <div className="bg-white/5 p-4 rounded-lg space-y-2">
-            <p><strong>Correo electrónico:</strong> protecciondatos@equinox.com.co</p>
-            <p><strong>Teléfono:</strong> [TELÉFONO DE CONTACTO]</p>
-            <p><strong>Dirección:</strong> [DIRECCIÓN FÍSICA]</p>
+            <p><strong>Correo electrónico:</strong> equinoxlogisticaytransporte@gmail.com</p>
+            <p><strong>Teléfono:</strong> +57 320 217 5321</p>
+            <p><strong>Dirección:</strong> Cll 12 Cra 4 #78, Colombia</p>
             <p><strong>Horario de atención:</strong> Lunes a Viernes, 8:00 a.m. a 5:00 p.m.</p>
           </div>
         </div>

@@ -14,7 +14,7 @@ export default function PoliticaPrivacidad() {
           <h2 className="text-xl font-semibold text-white mb-3">1. Información General</h2>
           <p>
             <strong className="text-yellow-400">EQUINOX LOGÍSTICA Y TRANSPORTE S.A.S.</strong>, identificada con 
-            NIT [NÚMERO DE NIT], con domicilio en [DIRECCIÓN], Colombia (en adelante &quot;EQUINOX&quot; o &quot;la Empresa&quot;), 
+            NIT 901.870.510-5, con domicilio en Cll 12 Cra 4 #78, Colombia (en adelante &quot;EQUINOX&quot; o &quot;la Empresa&quot;), 
             en cumplimiento de la Ley 1581 de 2012 y el Decreto 1377 de 2013, presenta su Política de 
             Privacidad para el tratamiento de datos personales.
           </p>
@@ -24,10 +24,10 @@ export default function PoliticaPrivacidad() {
           <h2 className="text-xl font-semibold text-white mb-3">2. Responsable del Tratamiento</h2>
           <ul className="list-disc pl-6 space-y-2">
             <li><strong>Razón Social:</strong> EQUINOX LOGÍSTICA Y TRANSPORTE S.A.S.</li>
-            <li><strong>NIT:</strong> [NÚMERO DE NIT]</li>
-            <li><strong>Dirección:</strong> [DIRECCIÓN COMPLETA]</li>
-            <li><strong>Teléfono:</strong> [TELÉFONO DE CONTACTO]</li>
-            <li><strong>Correo electrónico:</strong> protecciondatos@equinox.com.co</li>
+            <li><strong>NIT:</strong> 901.870.510-5</li>
+            <li><strong>Dirección:</strong> Cll 12 Cra 4 #78, Colombia</li>
+            <li><strong>Teléfono:</strong> +57 320 217 5321</li>
+            <li><strong>Correo electrónico:</strong> equinoxlogisticaytransporte@gmail.com</li>
             <li><strong>Sitio web:</strong> www.equinox.com.co</li>
           </ul>
         </div>
@@ -170,7 +170,7 @@ export default function PoliticaPrivacidad() {
         <div className="mt-8 p-4 bg-yellow-400/10 border border-yellow-400/30 rounded-lg">
           <p className="text-sm text-yellow-400">
             <strong>Contacto:</strong> Para cualquier consulta sobre esta política, comuníquese con 
-            nuestro oficial de protección de datos al correo protecciondatos@equinox.com.co
+            nosotros al correo equinoxlogisticaytransporte@gmail.com o al teléfono +57 320 217 5321
           </p>
         </div>
       </section>

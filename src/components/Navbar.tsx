@@ -150,6 +150,14 @@ const Navbar = () => {
                 Pre-operacional
               </Link>
             </li>
+            <li>
+              <Link 
+                href="/preoperacional/formato" 
+                className="text-gray-300 hover:text-yellow-400 transition-colors duration-300 font-medium text-sm lg:text-base"
+              >
+                Inspección Vehicular
+              </Link>
+            </li>
             {user && (
               <li>
                 <Link 
@@ -280,6 +288,16 @@ const Navbar = () => {
                   >
                     <span className="text-xl">🚛</span>
                     <span className="font-medium">Pre-operacional</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link 
+                    href="/preoperacional/formato" 
+                    onClick={closeMenu}
+                    className="flex items-center gap-3 px-4 py-3 text-gray-200 hover:text-yellow-400 hover:bg-white/5 rounded-xl transition-all duration-200"
+                  >
+                    <span className="text-xl">📝</span>
+                    <span className="font-medium">Formato Inspección</span>
                   </Link>
                 </li>
                 {user && (

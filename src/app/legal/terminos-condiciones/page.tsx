@@ -20,7 +20,7 @@ export default function TerminosCondiciones() {
         <div>
           <h2 className="text-xl font-semibold text-white mb-3">1. Definiciones</h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li><strong>&quot;EQUINOX&quot; o &quot;la Empresa&quot;:</strong> EQUINOX LOGÍSTICA Y TRANSPORTE S.A.S., NIT [NÚMERO DE NIT]</li>
+            <li><strong>&quot;EQUINOX&quot; o &quot;la Empresa&quot;:</strong> EQUINOX LOGÍSTICA Y TRANSPORTE S.A.S., NIT 901.870.510-5</li>
             <li><strong>&quot;Plataforma&quot;:</strong> El sitio web, aplicaciones y servicios digitales de EQUINOX</li>
             <li><strong>&quot;Usuario&quot;:</strong> Toda persona que acceda o utilice la Plataforma</li>
             <li><strong>&quot;Conductor&quot;:</strong> Persona que utiliza la Plataforma para registrar inspecciones</li>
@@ -220,9 +220,9 @@ export default function TerminosCondiciones() {
           </p>
           <div className="bg-white/5 p-4 rounded-lg space-y-2">
             <p><strong>EQUINOX LOGÍSTICA Y TRANSPORTE S.A.S.</strong></p>
-            <p><strong>Correo electrónico:</strong> legal@equinox.com.co</p>
-            <p><strong>Teléfono:</strong> [TELÉFONO DE CONTACTO]</p>
-            <p><strong>Dirección:</strong> [DIRECCIÓN FÍSICA]</p>
+            <p><strong>Correo electrónico:</strong> equinoxlogisticaytransporte@gmail.com</p>
+            <p><strong>Teléfono:</strong> +57 320 217 5321</p>
+            <p><strong>Dirección:</strong> Cll 12 Cra 4 #78, Colombia</p>
           </div>
         </div>
 

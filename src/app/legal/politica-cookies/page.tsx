@@ -180,8 +180,8 @@ export default function PoliticaCookies() {
             Si tiene preguntas sobre nuestra política de cookies, contáctenos en:
           </p>
           <ul className="list-disc pl-6 space-y-2 mt-3">
-            <li><strong>Email:</strong> protecciondatos@equinox.com.co</li>
-            <li><strong>Teléfono:</strong> [TELÉFONO DE CONTACTO]</li>
+            <li><strong>Email:</strong> equinoxlogisticaytransporte@gmail.com</li>
+            <li><strong>Teléfono:</strong> +57 320 217 5321</li>
           </ul>
         </div>
 
