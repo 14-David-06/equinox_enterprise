@@ -650,10 +650,22 @@ export default function PreoperacionalPage() {
       return false;
     }
     const todosLosItems = [...ITEMS_SEGURIDAD, ...ITEMS_GENERALES, ...ITEMS_MECANICOS, ...ITEMS_CORREAS, ...ITEMS_HIGIENE, ...ITEMS_SALUD];
+    const itemsSaludConObservacionPositiva = [43, 44, 45]; // Items donde "Sí" requiere observación
     for (const item of todosLosItems) {
       const estado = itemsVerificacion[item.id];
-      if (estado?.cumple === false && (!estado.observacion || estado.observacion.trim() === '')) {
-        alert(`El item "${item.nombre}" no cumple. Debe agregar una observación.`);
+      const esItemSalud = itemsSaludConObservacionPositiva.includes(item.id);
+      
+      // Para items de salud (43, 44, 45): si responde "Sí" (cumple = true), requiere observación
+      // Para otros items: si responde "No" (cumple = false), requiere observación
+      const requiereObservacion = esItemSalud 
+        ? estado?.cumple === true 
+        : estado?.cumple === false;
+      
+      if (requiereObservacion && (!estado?.observacion || estado.observacion.trim() === '')) {
+        const mensajeItem = esItemSalud 
+          ? `Ha indicado "Sí" en "${item.nombre}". Por favor explique en la observación.`
+          : `El item "${item.nombre}" no cumple. Debe agregar una observación.`;
+        alert(mensajeItem);
         return false;
       }
     }
@@ -727,7 +739,13 @@ export default function PreoperacionalPage() {
 
   const renderItemVerificacion = (item: { id: number; nombre: string }) => {
     const estado = itemsVerificacion[item.id] || { cumple: null, observacion: '' };
-    const requiereObservacion = estado.cumple === false;
+    // Items 43, 44, 45 son preguntas de salud donde "Sí" indica un problema
+    // Para estos items, la observación es requerida cuando responden "Sí" (cumple === true)
+    // Para el resto, la observación es requerida cuando responden "No" (cumple === false)
+    const esItemSalud = [43, 44, 45].includes(item.id);
+    const requiereObservacion = esItemSalud 
+      ? estado.cumple === true  // Sí = tiene problema, requiere explicación
+      : estado.cumple === false; // No cumple, requiere observación
     return (
       <div key={item.id} className="p-3 sm:p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
         <div className="flex items-start gap-3">

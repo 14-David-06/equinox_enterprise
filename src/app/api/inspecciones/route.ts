@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TABLES, INSPECCION_FIELDS, getInspeccionesConfig } from '@/lib/airtable-config';
+import { TABLES, INSPECCION_FIELDS, getInspeccionesConfig, getConductoresConfig, CONDUCTOR_FIELDS } from '@/lib/airtable-config';
 import { verifyToken } from '@/lib/jwt';
 import { applyRateLimit } from '@/lib/rate-limit';
 import cookie from 'cookie';
@@ -42,6 +42,49 @@ async function fetchAirtable(tableName: string, params?: Record<string, string>)
   }
 
   return response.json();
+}
+
+// Función para buscar conductores en la base de Conductores
+async function fetchConductores(): Promise<Map<string, any>> {
+  const config = getConductoresConfig();
+  
+  if (!config.API_KEY || !config.BASE_ID) {
+    console.warn('Conductores config no disponible');
+    return new Map();
+  }
+  
+  const url = `${config.BASE_URL}/${config.BASE_ID}/${encodeURIComponent(TABLES.CONDUCTORES.NAME)}?maxRecords=500`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${config.API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    console.warn('Error fetching conductores:', response.status);
+    return new Map();
+  }
+
+  const data = await response.json();
+  
+  // Crear un mapa de cédula -> datos del conductor
+  const conductoresMap = new Map<string, any>();
+  for (const record of data.records) {
+    const cedula = record.fields?.[CONDUCTOR_FIELDS.CEDULA];
+    if (cedula) {
+      conductoresMap.set(cedula, {
+        edad: record.fields?.[CONDUCTOR_FIELDS.EDAD],
+        rh: record.fields?.[CONDUCTOR_FIELDS.RH],
+        eps: record.fields?.[CONDUCTOR_FIELDS.EPS],
+        arl: record.fields?.[CONDUCTOR_FIELDS.ARL],
+        fondoPension: record.fields?.[CONDUCTOR_FIELDS.FONDO_PENSION],
+      });
+    }
+  }
+  
+  return conductoresMap;
 }
 
 // Función para crear registro en Airtable (usa la config de inspecciones)
@@ -96,11 +139,25 @@ export async function GET(request: NextRequest) {
     // Consultar desde Airtable
     const data = await fetchAirtable(TABLES.INSPECCIONES_PREOPERACIONALES.NAME, { maxRecords: '50' });
 
-    // Formatear los datos de Airtable
-    const inspeccionesFormateadas = data.records.map((record: any) => ({
-      id: record.id,
-      ...record.fields,
-    }));
+    // Buscar datos de conductores para enriquecer las inspecciones
+    const conductoresMap = await fetchConductores();
+
+    // Formatear los datos de Airtable y enriquecer con datos del conductor
+    const inspeccionesFormateadas = data.records.map((record: any) => {
+      const cedula = record.fields?.['Conductor Cedula'];
+      const conductorData = cedula ? conductoresMap.get(cedula) : null;
+      
+      return {
+        id: record.id,
+        ...record.fields,
+        // Añadir datos del conductor desde la tabla Conductores
+        'Conductor Edad': conductorData?.edad || null,
+        'Conductor RH': conductorData?.rh || null,
+        'Conductor EPS': conductorData?.eps || null,
+        'Conductor ARL': conductorData?.arl || null,
+        'Conductor Fondo Pension': conductorData?.fondoPension || null,
+      };
+    });
 
     return NextResponse.json(inspeccionesFormateadas);
   } catch (error) {

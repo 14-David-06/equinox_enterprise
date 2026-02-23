@@ -104,10 +104,11 @@ async function upsertConductor(conductorData: any) {
     [CONDUCTOR_FIELDS.ACEPTO_POLITICAS]: conductorData.aceptoPoliticas || false,
     [CONDUCTOR_FIELDS.ACEPTO_COOKIES]: conductorData.aceptoCookies || false,
     [CONDUCTOR_FIELDS.ESTADO]: 'Activo',
-    // Campos de GPS (contraseña encriptada)
+    // Campos de GPS (usuario y contraseña encriptados)
     [CONDUCTOR_FIELDS.GPS_NOMBRE]: conductorData.gpsNombre || undefined,
-    [CONDUCTOR_FIELDS.GPS_USUARIO]: conductorData.gpsUsuario || undefined,
+    [CONDUCTOR_FIELDS.GPS_USUARIO]: conductorData.gpsUsuario ? encrypt(conductorData.gpsUsuario) : undefined,
     [CONDUCTOR_FIELDS.GPS_PASSWORD]: conductorData.gpsPassword ? encrypt(conductorData.gpsPassword) : undefined,
+    [CONDUCTOR_FIELDS.GPS_AUTORIZACION_MONITOREO]: conductorData.gpsAutorizacion || false,
   } as Record<string, unknown>;
 
   // Limpiar campos undefined
@@ -184,6 +185,7 @@ export async function POST(request: NextRequest) {
       gpsNombre: body.datosGPS?.nombreGPS || '',
       gpsUsuario: body.datosGPS?.usuario || '',
       gpsPassword: body.datosGPS?.contrasena || '',
+      gpsAutorizacion: body.datosGPS?.autorizacionMonitoreo || false,
     });
 
     // 2. Obtener información de auditoría
@@ -205,11 +207,17 @@ export async function POST(request: NextRequest) {
       [INSPECCION_PREOP_FIELDS.CODIGO_FORMATO]: body.infoFormato?.codigo || 'HSEQ-FOR-065',
       [INSPECCION_PREOP_FIELDS.VERSION_FORMATO]: body.infoFormato?.version || '002',
       
-      // Conductor
+      // Conductor (datos adicionales se guardan en tabla Conductores)
       [INSPECCION_PREOP_FIELDS.CONDUCTOR_CEDULA]: body.conductor.cedula,
       [INSPECCION_PREOP_FIELDS.CONDUCTOR_NOMBRE]: body.conductor.nombreCompleto,
       [INSPECCION_PREOP_FIELDS.CONDUCTOR_TELEFONO]: body.conductor.telefono || '',
       [INSPECCION_PREOP_FIELDS.CONDUCTOR_EMAIL]: body.conductor.email || '',
+      
+      // GPS (encriptado para proteger datos sensibles)
+      [INSPECCION_PREOP_FIELDS.GPS_NOMBRE]: body.datosGPS?.nombreGPS || '',
+      [INSPECCION_PREOP_FIELDS.GPS_USUARIO]: body.datosGPS?.usuario ? encrypt(body.datosGPS.usuario) : '',
+      [INSPECCION_PREOP_FIELDS.GPS_PASSWORD]: body.datosGPS?.contrasena ? encrypt(body.datosGPS.contrasena) : '',
+      [INSPECCION_PREOP_FIELDS.GPS_AUTORIZACION_MONITOREO]: body.datosGPS?.autorizacionMonitoreo || false,
       
       // Vehículo
       [INSPECCION_PREOP_FIELDS.VEHICULO_PLACA]: body.vehiculo.placa,

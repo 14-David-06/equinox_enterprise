@@ -90,6 +90,28 @@ export function getInspeccionesConfig() {
   } as const;
 }
 
+// ===========================================
+// CONFIGURACIÓN - INSPECCIONES VEHICULARES (HSEQ-FOR-065)
+// ===========================================
+
+export function getInspeccionVehicularConfig() {
+  const apiKey = process.env.AIRTABLE_INSPECCION_VEHICULAR_API_KEY;
+  const baseId = process.env.AIRTABLE_INSPECCION_VEHICULAR_BASE_ID;
+  const tableId = process.env.AIRTABLE_INSPECCION_VEHICULAR_TABLE_ID;
+  
+  if (!apiKey || !baseId) {
+    console.warn('⚠️ AIRTABLE INSPECCION VEHICULAR: Credenciales no configuradas. Revisa las variables de entorno.');
+  }
+  
+  return {
+    API_KEY: apiKey || '',
+    BASE_ID: baseId || '',
+    TABLE_ID: tableId || '',
+    TABLE_NAME: process.env.AIRTABLE_INSPECCION_VEHICULAR_TABLE_NAME || 'Inspeccion Vehiccular',
+    BASE_URL: 'https://api.airtable.com/v0',
+  } as const;
+}
+
 export const AIRTABLE_CONFIG = getAirtableConfig();
 
 // ===========================================
@@ -149,6 +171,7 @@ export const CONDUCTOR_FIELDS = {
   GPS_NOMBRE: 'GPS Nombre',
   GPS_USUARIO: 'GPS Usuario',
   GPS_PASSWORD: 'GPS Password',
+  GPS_AUTORIZACION_MONITOREO: 'GPS Autorizacion Monitoreo',
   
   // Campos personales
   EDAD: 'Edad',
@@ -198,6 +221,160 @@ export const REMOLQUE_FIELDS = {
 } as const;
 
 // ===========================================
+// CAMPOS DE LA TABLA INSPECCION VEHICULAR (HSEQ-FOR-065)
+// ===========================================
+
+export const INSPECCION_VEHICULAR_FIELDS = {
+  // Metadatos
+  CODIGO_INSPECCION: 'Codigo Inspeccion',
+  FECHA_INSPECCION: 'Fecha Inspeccion',
+  CODIGO_FORMATO: 'Codigo Formato',
+  VERSION_FORMATO: 'Version Formato',
+  
+  // Conductor
+  CONDUCTOR_CEDULA: 'Conductor Cedula',
+  CONDUCTOR_NOMBRE: 'Conductor Nombre',
+  CONDUCTOR_EDAD: 'Conductor Edad',
+  CONDUCTOR_EPS: 'Conductor EPS',
+  CONDUCTOR_ARL: 'Conductor ARL',
+  CONDUCTOR_FONDO_PENSION: 'Conductor Fondo Pension',
+  CONDUCTOR_RH: 'Conductor RH',
+  
+  // Vehículo
+  VEHICULO_PLACA: 'Vehiculo Placa',
+  VEHICULO_MARCA: 'Vehiculo Marca',
+  VEHICULO_LINEA: 'Vehiculo Linea',
+  VEHICULO_MODELO: 'Vehiculo Modelo',
+  
+  // Remolque
+  REMOLQUE_PLACA: 'Remolque Placa',
+  REMOLQUE_MARCA: 'Remolque Marca',
+  REMOLQUE_CLASE: 'Remolque Clase',
+  REMOLQUE_MODELO: 'Remolque Modelo',
+  
+  // Documentos
+  SOAT_CUMPLE: 'SOAT Cumple',
+  SOAT_VENCIMIENTO: 'SOAT Vencimiento',
+  RTM_CUMPLE: 'RTM Cumple',
+  RTM_VENCIMIENTO: 'RTM Vencimiento',
+  POLIZA_CUMPLE: 'Poliza Cumple',
+  POLIZA_VENCIMIENTO: 'Poliza Vencimiento',
+  LICENCIA_CUMPLE: 'Licencia Cumple',
+  CATEGORIAS_LICENCIA: 'Categorias Licencia',
+  VIGENCIAS_LICENCIA: 'Vigencias Licencia',
+  
+  // Condiciones operativas
+  HORAS_DORMIR: 'Horas Dormir',
+  KILOMETRAJE_INICIAL: 'Kilometraje Inicial',
+  
+  // Items de verificación (44 items con sus observaciones)
+  ITEM_01_EXTINTOR: 'Item 01 Extintor',
+  ITEM_01_OBS: 'Item 01 Obs',
+  ITEM_02_EQUIPO_CARRETERA: 'Item 02 Equipo Carretera',
+  ITEM_02_OBS: 'Item 02 Obs',
+  ITEM_03_BOTIQUIN: 'Item 03 Botiquin',
+  ITEM_03_OBS: 'Item 03 Obs',
+  ITEM_04_CINTURONES: 'Item 04 Cinturones',
+  ITEM_04_OBS: 'Item 04 Obs',
+  ITEM_05_BOCINA: 'Item 05 Bocina',
+  ITEM_05_OBS: 'Item 05 Obs',
+  ITEM_06_LUCES: 'Item 06 Luces',
+  ITEM_06_OBS: 'Item 06 Obs',
+  ITEM_07_ESPEJOS: 'Item 07 Espejos',
+  ITEM_07_OBS: 'Item 07 Obs',
+  ITEM_08_RETROVISORES: 'Item 08 Retrovisores',
+  ITEM_08_OBS: 'Item 08 Obs',
+  ITEM_09_SENALIZACION: 'Item 09 Senalizacion',
+  ITEM_09_OBS: 'Item 09 Obs',
+  ITEM_10_TANQUE: 'Item 10 Tanque',
+  ITEM_10_OBS: 'Item 10 Obs',
+  ITEM_11_TAPA_TANQUE: 'Item 11 Tapa Tanque',
+  ITEM_11_OBS: 'Item 11 Obs',
+  ITEM_12_CABINA: 'Item 12 Cabina',
+  ITEM_12_OBS: 'Item 12 Obs',
+  ITEM_13_LLANTAS: 'Item 13 Llantas',
+  ITEM_13_OBS: 'Item 13 Obs',
+  ITEM_14_LLANTA_REPUESTO: 'Item 14 Llanta Repuesto',
+  ITEM_14_OBS: 'Item 14 Obs',
+  ITEM_15_RINES: 'Item 15 Rines',
+  ITEM_15_OBS: 'Item 15 Obs',
+  ITEM_16_FRENOS: 'Item 16 Frenos',
+  ITEM_16_OBS: 'Item 16 Obs',
+  ITEM_17_FRENO_MANO: 'Item 17 Freno Mano',
+  ITEM_17_OBS: 'Item 17 Obs',
+  ITEM_18_DIRECCION: 'Item 18 Direccion',
+  ITEM_18_OBS: 'Item 18 Obs',
+  ITEM_19_MOTOR: 'Item 19 Motor',
+  ITEM_19_OBS: 'Item 19 Obs',
+  ITEM_20_FLUIDOS: 'Item 20 Fluidos',
+  ITEM_20_OBS: 'Item 20 Obs',
+  ITEM_21_SUSPENSION: 'Item 21 Suspension',
+  ITEM_21_OBS: 'Item 21 Obs',
+  ITEM_22_LUCES_FUNC: 'Item 22 Luces Func',
+  ITEM_22_OBS: 'Item 22 Obs',
+  ITEM_23_FUGAS: 'Item 23 Fugas',
+  ITEM_23_OBS: 'Item 23 Obs',
+  ITEM_24_HERRAMIENTAS: 'Item 24 Herramientas',
+  ITEM_24_OBS: 'Item 24 Obs',
+  ITEM_25_ANCLAJE: 'Item 25 Anclaje',
+  ITEM_25_OBS: 'Item 25 Obs',
+  ITEM_26_CABLE_ACERO: 'Item 26 Cable Acero',
+  ITEM_26_OBS: 'Item 26 Obs',
+  ITEM_27_ESPEJOS_EST: 'Item 27 Espejos Est',
+  ITEM_27_OBS: 'Item 27 Obs',
+  ITEM_28_TORQUE: 'Item 28 Torque',
+  ITEM_28_OBS: 'Item 28 Obs',
+  ITEM_29_CAJA_CAMBIOS: 'Item 29 Caja Cambios',
+  ITEM_29_OBS: 'Item 29 Obs',
+  ITEM_30_AMORTIGUADORES: 'Item 30 Amortiguadores',
+  ITEM_30_OBS: 'Item 30 Obs',
+  ITEM_31_COMP_SUSPENSION: 'Item 31 Comp Suspension',
+  ITEM_31_OBS: 'Item 31 Obs',
+  ITEM_32_REFRIGERANTE: 'Item 32 Refrigerante',
+  ITEM_32_OBS: 'Item 32 Obs',
+  ITEM_33_MANGUERAS: 'Item 33 Mangueras',
+  ITEM_33_OBS: 'Item 33 Obs',
+  ITEM_34_FRENOS_EMERG: 'Item 34 Frenos Emerg',
+  ITEM_34_OBS: 'Item 34 Obs',
+  ITEM_35_BATERIA: 'Item 35 Bateria',
+  ITEM_35_OBS: 'Item 35 Obs',
+  ITEM_36_LUBRICACION: 'Item 36 Lubricacion',
+  ITEM_36_OBS: 'Item 36 Obs',
+  ITEM_37_ESCAPE: 'Item 37 Escape',
+  ITEM_37_OBS: 'Item 37 Obs',
+  ITEM_38_CORREAS: 'Item 38 Correas',
+  ITEM_38_OBS: 'Item 38 Obs',
+  ITEM_39_LIMPIEZA: 'Item 39 Limpieza',
+  ITEM_39_OBS: 'Item 39 Obs',
+  ITEM_40_DESCANSO: 'Item 40 Descanso',
+  ITEM_40_OBS: 'Item 40 Obs',
+  ITEM_41_TRATAMIENTO: 'Item 41 Tratamiento',
+  ITEM_41_OBS: 'Item 41 Obs',
+  ITEM_42_ANSIEDAD: 'Item 42 Ansiedad',
+  ITEM_42_OBS: 'Item 42 Obs',
+  ITEM_43_NEUROLOGICO: 'Item 43 Neurologico',
+  ITEM_43_OBS: 'Item 43 Obs',
+  ITEM_44_CONDICIONES_SALUD: 'Item 44 Condiciones Salud',
+  ITEM_44_OBS: 'Item 44 Obs',
+  
+  // Totales y porcentaje
+  TOTAL_ITEMS_CUMPLE: 'Total Items Cumple',
+  TOTAL_ITEMS_NO_CUMPLE: 'Total Items No Cumple',
+  PORCENTAJE_CUMPLIMIENTO: 'Porcentaje Cumplimiento',
+  
+  // Firma y estado
+  FIRMA_CONDUCTOR: 'Firma Conductor',
+  ESTADO_INSPECCION: 'Estado Inspeccion',
+  OBSERVACIONES_GENERALES: 'Observaciones Generales',
+  
+  // Revisión HSEQ
+  FIRMA_HSEQ: 'Firma HSEQ',
+  NOMBRE_HSEQ: 'Nombre HSEQ',
+  FECHA_REVISION_HSEQ: 'Fecha Revision HSEQ',
+  OBSERVACIONES_HSEQ: 'Observaciones HSEQ',
+} as const;
+
+// ===========================================
 // CAMPOS DE LA TABLA INSPECCIONES_PREOPERACIONALES
 // ===========================================
 
@@ -217,6 +394,17 @@ export const INSPECCION_PREOP_FIELDS = {
   CONDUCTOR_NOMBRE: 'Conductor Nombre',
   CONDUCTOR_TELEFONO: 'Conductor Telefono',
   CONDUCTOR_EMAIL: 'Conductor Email',
+  CONDUCTOR_EDAD: 'Conductor Edad',
+  CONDUCTOR_RH: 'Conductor RH',
+  CONDUCTOR_EPS: 'Conductor EPS',
+  CONDUCTOR_ARL: 'Conductor ARL',
+  CONDUCTOR_FONDO_PENSION: 'Conductor Fondo Pension',
+  
+  // GPS
+  GPS_NOMBRE: 'GPS Nombre',
+  GPS_USUARIO: 'GPS Usuario',
+  GPS_PASSWORD: 'GPS Password',
+  GPS_AUTORIZACION_MONITOREO: 'GPS Autorizacion Monitoreo',
   
   // Vehículo
   VEHICULO_PLACA: 'Vehiculo Placa',

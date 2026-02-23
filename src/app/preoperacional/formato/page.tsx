@@ -418,21 +418,58 @@ export default function FormatoInspeccionPage() {
     setIsLoading(true);
 
     try {
+      // Estructura de datos para el nuevo API de inspección vehicular
       const dataToSend = {
-        tipoFormulario: 'FORMATO_INSPECCION',
-        fecha: new Date().toISOString(),
-        infoFormato: INFO_FORMATO,
-        conductor,
-        documentos: { ...documentos, categoriasLicencia: categoriasSeleccionadas, vigenciasLicencia },
-        vehiculo,
-        remolque,
-        horasDormir,
-        kilometrajeInicial,
+        conductor: {
+          cedula: conductor.cedula,
+          nombre: conductor.nombreCompleto,
+          edad: conductor.edad,
+          eps: conductor.eps,
+          arl: conductor.arl,
+          fondoPension: conductor.fondoPension,
+          rh: conductor.rh,
+        },
+        vehiculo: {
+          placa: vehiculo.placa,
+          marca: vehiculo.marca,
+          linea: vehiculo.linea,
+          modelo: vehiculo.modelo,
+        },
+        remolque: {
+          placa: remolque.placa,
+          marca: remolque.marca,
+          clase: remolque.clase,
+          modelo: remolque.modelo,
+        },
+        documentos: {
+          soat: {
+            cumple: documentos.soatCumple,
+            vencimiento: documentos.soatVencimiento,
+          },
+          rtm: {
+            cumple: documentos.revisionCumple,
+            vencimiento: documentos.revisionVencimiento,
+          },
+          poliza: {
+            cumple: documentos.polizaCumple,
+            vencimiento: documentos.polizaVencimiento,
+          },
+          licencia: {
+            cumple: documentos.licenciaCumple,
+            categorias: categoriasSeleccionadas,
+            vigencias: vigenciasLicencia,
+          },
+        },
+        condiciones: {
+          horasDormir: parseInt(horasDormir) || 0,
+          kilometrajeInicial: parseInt(kilometrajeInicial) || 0,
+        },
         itemsVerificacion,
-        firmaConductor,
+        firma: firmaConductor,
+        observacionesGenerales: '',
       };
 
-      const response = await fetch('/api/preoperacional', {
+      const response = await fetch('/api/inspeccion-vehicular', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataToSend),
@@ -441,10 +478,10 @@ export default function FormatoInspeccionPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Error al guardar la inspección');
+        throw new Error(result.error || result.details || 'Error al guardar la inspección');
       }
 
-      alert(`✅ Inspección registrada correctamente\n\nCódigo: ${result.data?.codigoInspeccion || 'Generado'}`);
+      alert(`✅ Inspección registrada correctamente\n\nCódigo: ${result.data?.codigoInspeccion || 'Generado'}\n\n📊 Cumplimiento: ${result.data?.porcentajeCumplimiento || 0}%\n✓ Items OK: ${result.data?.totalCumple || 0}\n✗ Items con observación: ${result.data?.totalNoCumple || 0}`);
       
       // Limpiar formulario
       setItemsVerificacion({});

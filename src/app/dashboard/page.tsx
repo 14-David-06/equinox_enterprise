@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
+// Tipo de inspección a monitorear
+type TipoInspeccion = 'preoperacional' | 'vehicular';
+
 interface Inspeccion {
   id: string;
   createdAt: string;
@@ -15,6 +18,12 @@ interface Inspeccion {
   arl: string;
   eps: string;
   fondoPension: string;
+  // GPS
+  gpsNombre: string | null;
+  gpsUsuario: string | null;
+  gpsPassword: string | null;
+  gpsAutorizacion: boolean;
+  // Vehículo
   placaVehiculo: string;
   marcaVehiculo: string;
   lineaVehiculo: string;
@@ -56,6 +65,56 @@ interface Inspeccion {
   codigoInspeccion: string | null;
 }
 
+// Interface para inspecciones vehiculares
+interface InspeccionVehicular {
+  id: string;
+  createdAt: string;
+  codigoInspeccion: string;
+  fechaInspeccion: string;
+  // Conductor
+  conductorCedula: string;
+  conductorNombre: string;
+  conductorEdad: string;
+  conductorEps: string;
+  conductorArl: string;
+  conductorFondoPension: string;
+  conductorRh: string;
+  // Vehículo
+  vehiculoPlaca: string;
+  vehiculoMarca: string;
+  vehiculoLinea: string;
+  vehiculoModelo: string;
+  // Remolque
+  remolquePlaca: string | null;
+  remolqueMarca: string | null;
+  remolqueClase: string | null;
+  remolqueModelo: string | null;
+  // Documentos
+  soatCumple: string;
+  soatVencimiento: string | null;
+  rtmCumple: string;
+  rtmVencimiento: string | null;
+  polizaCumple: string;
+  polizaVencimiento: string | null;
+  licenciaCumple: string;
+  categoriasLicencia: string | null;
+  // Condiciones
+  horasDormir: string;
+  kilometrajeInicial: string;
+  // Totales
+  totalItemsCumple: number;
+  totalItemsNoCumple: number;
+  porcentajeCumplimiento: string;
+  // Estado
+  estadoInspeccion: string;
+  observacionesGenerales: string | null;
+  // HSEQ
+  firmaHseq: string | null;
+  nombreHseq: string | null;
+  fechaRevisionHseq: string | null;
+  observacionesHseq: string | null;
+}
+
 interface User {
   id: string;
   nombre: string;
@@ -66,13 +125,16 @@ interface User {
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [tipoInspeccion, setTipoInspeccion] = useState<TipoInspeccion>('preoperacional');
   const [inspecciones, setInspecciones] = useState<Inspeccion[]>([]);
+  const [inspeccionesVehiculares, setInspeccionesVehiculares] = useState<InspeccionVehicular[]>([]);
   const [loading, setLoading] = useState(true);
   const [authChecking, setAuthChecking] = useState(true);
   
   // Estados para filtros y vista
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInspection, setSelectedInspection] = useState<Inspeccion | null>(null);
+  const [selectedInspeccionVehicular, setSelectedInspeccionVehicular] = useState<InspeccionVehicular | null>(null);
   const [filterBy, setFilterBy] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'conductor' | 'placa'>('date');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
@@ -87,6 +149,50 @@ export default function DashboardPage() {
   const [firmaHSEQData, setFirmaHSEQData] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+
+  // Estados para ver datos GPS
+  const [showGPSModal, setShowGPSModal] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsData, setGpsData] = useState<{
+    nombre: string;
+    usuario: string;
+    password: string;
+    autorizacionMonitoreo: boolean;
+  } | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+
+  // Función para obtener datos GPS desencriptados
+  const fetchGPSData = async (inspeccionId: string) => {
+    setGpsLoading(true);
+    setGpsError(null);
+    setGpsData(null);
+    
+    try {
+      const res = await fetch('/api/inspecciones/gps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ inspeccionId }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al obtener datos GPS');
+      }
+      
+      if (data.gpsData) {
+        setGpsData(data.gpsData);
+        setShowGPSModal(true);
+      } else {
+        setGpsError('No hay datos GPS registrados para esta inspección');
+      }
+    } catch (error) {
+      setGpsError(error instanceof Error ? error.message : 'Error al obtener datos GPS');
+    } finally {
+      setGpsLoading(false);
+    }
+  };
 
   // Verificar autenticación
   useEffect(() => {
@@ -167,10 +273,15 @@ export default function DashboardPage() {
             nombreConductor: record['Conductor Nombre'] || 'Sin nombre',
             cedula: record['Conductor Cedula'] || 'Sin cédula',
             edad: record['Conductor Edad'] || 'N/A',
-            rh: record['RH'] || 'N/A',
-            arl: record['ARL'] || 'N/A',
-            eps: record['EPS'] || 'N/A',
-            fondoPension: record['Fondo Pension'] || 'N/A',
+            rh: record['Conductor RH'] || 'N/A',
+            arl: record['Conductor ARL'] || 'N/A',
+            eps: record['Conductor EPS'] || 'N/A',
+            fondoPension: record['Conductor Fondo Pension'] || 'N/A',
+            // GPS
+            gpsNombre: record['GPS Nombre'] || null,
+            gpsUsuario: record['GPS Usuario'] || null,
+            gpsPassword: record['GPS Password'] || null,
+            gpsAutorizacion: record['GPS Autorizacion Monitoreo'] || false,
             // Vehículo
             placaVehiculo: record['Vehiculo Placa'] || 'Sin placa',
             marcaVehiculo: record['Vehiculo Marca'] || 'N/A',
@@ -237,6 +348,83 @@ export default function DashboardPage() {
     };
 
     loadInspecciones();
+  }, [user]);
+
+  // Cargar inspecciones vehiculares
+  useEffect(() => {
+    const loadInspeccionesVehiculares = async () => {
+      if (!user) return;
+      
+      try {
+        const res = await fetch('/api/inspeccion-vehicular', { credentials: 'include' });
+        
+        if (!res.ok) {
+          throw new Error('Error al cargar inspecciones vehiculares');
+        }
+        
+        const data = await res.json();
+        
+        if (data.success && data.records) {
+          const vehicularesMapeadas = data.records.map((record: any) => {
+            const fields = record.fields || {};
+            return {
+              id: record.id,
+              createdAt: fields['Fecha Inspeccion'] || '',
+              codigoInspeccion: fields['Codigo Inspeccion'] || record.id,
+              fechaInspeccion: fields['Fecha Inspeccion'] || '',
+              // Conductor
+              conductorCedula: fields['Conductor Cedula'] || '',
+              conductorNombre: fields['Conductor Nombre'] || 'Sin nombre',
+              conductorEdad: fields['Conductor Edad'] || '',
+              conductorEps: fields['Conductor EPS'] || '',
+              conductorArl: fields['Conductor ARL'] || '',
+              conductorFondoPension: fields['Conductor Fondo Pension'] || '',
+              conductorRh: fields['Conductor RH'] || '',
+              // Vehículo
+              vehiculoPlaca: fields['Vehiculo Placa'] || 'Sin placa',
+              vehiculoMarca: fields['Vehiculo Marca'] || '',
+              vehiculoLinea: fields['Vehiculo Linea'] || '',
+              vehiculoModelo: fields['Vehiculo Modelo'] || '',
+              // Remolque
+              remolquePlaca: fields['Remolque Placa'] || null,
+              remolqueMarca: fields['Remolque Marca'] || null,
+              remolqueClase: fields['Remolque Clase'] || null,
+              remolqueModelo: fields['Remolque Modelo'] || null,
+              // Documentos
+              soatCumple: fields['SOAT Cumple'] || 'N/A',
+              soatVencimiento: fields['SOAT Vencimiento'] || null,
+              rtmCumple: fields['RTM Cumple'] || 'N/A',
+              rtmVencimiento: fields['RTM Vencimiento'] || null,
+              polizaCumple: fields['Poliza Cumple'] || 'N/A',
+              polizaVencimiento: fields['Poliza Vencimiento'] || null,
+              licenciaCumple: fields['Licencia Cumple'] || 'N/A',
+              categoriasLicencia: fields['Categorias Licencia'] || null,
+              // Condiciones
+              horasDormir: fields['Horas Dormir'] || '',
+              kilometrajeInicial: fields['Kilometraje Inicial'] || '',
+              // Totales
+              totalItemsCumple: parseInt(fields['Total Items Cumple'] || '0'),
+              totalItemsNoCumple: parseInt(fields['Total Items No Cumple'] || '0'),
+              porcentajeCumplimiento: fields['Porcentaje Cumplimiento'] || '0%',
+              // Estado
+              estadoInspeccion: fields['Estado Inspeccion'] || 'Pendiente',
+              observacionesGenerales: fields['Observaciones Generales'] || null,
+              // HSEQ
+              firmaHseq: fields['Firma HSEQ'] || null,
+              nombreHseq: fields['Nombre HSEQ'] || null,
+              fechaRevisionHseq: fields['Fecha Revision HSEQ'] || null,
+              observacionesHseq: fields['Observaciones HSEQ'] || null,
+            };
+          });
+          
+          setInspeccionesVehiculares(vehicularesMapeadas);
+        }
+      } catch (error) {
+        console.error('Error al cargar inspecciones vehiculares:', error);
+      }
+    };
+
+    loadInspeccionesVehiculares();
   }, [user]);
 
   // Canvas drawing functions for HSEQ signature - must be before early returns
@@ -336,6 +524,68 @@ export default function DashboardPage() {
   const filteredInspecciones = getFilteredInspecciones();
   const totalPages = Math.ceil(filteredInspecciones.length / itemsPerPage);
   const paginatedInspecciones = filteredInspecciones.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Funciones de filtrado y ordenamiento para inspecciones vehiculares
+  const getFilteredInspeccionesVehiculares = () => {
+    let filtered = inspeccionesVehiculares;
+    
+    // Filtrar por búsqueda
+    if (searchTerm) {
+      filtered = filtered.filter(insp => 
+        insp.conductorNombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insp.conductorCedula?.includes(searchTerm) ||
+        insp.vehiculoPlaca?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insp.vehiculoMarca?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Filtrar por fecha
+    if (filterBy !== 'all') {
+      const now = new Date();
+      filtered = filtered.filter(insp => {
+        const created = new Date(insp.fechaInspeccion || insp.createdAt);
+        switch (filterBy) {
+          case 'today':
+            return created.toDateString() === now.toDateString();
+          case 'week':
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return created >= weekAgo;
+          case 'month':
+            return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Ordenar - Pendiente primero, luego por criterio seleccionado
+    filtered.sort((a, b) => {
+      // Primero: pendientes de revisión arriba
+      const aIsPending = a.estadoInspeccion === 'Pendiente' ? 0 : 1;
+      const bIsPending = b.estadoInspeccion === 'Pendiente' ? 0 : 1;
+      if (aIsPending !== bIsPending) return aIsPending - bIsPending;
+      
+      switch (sortBy) {
+        case 'date':
+          return new Date(b.fechaInspeccion || b.createdAt || 0).getTime() - new Date(a.fechaInspeccion || a.createdAt || 0).getTime();
+        case 'conductor':
+          return (a.conductorNombre || '').localeCompare(b.conductorNombre || '');
+        case 'placa':
+          return (a.vehiculoPlaca || '').localeCompare(b.vehiculoPlaca || '');
+        default:
+          return 0;
+      }
+    });
+    
+    return filtered;
+  };
+
+  const filteredInspeccionesVehiculares = getFilteredInspeccionesVehiculares();
+  const totalPagesVehiculares = Math.ceil(filteredInspeccionesVehiculares.length / itemsPerPage);
+  const paginatedInspeccionesVehiculares = filteredInspeccionesVehiculares.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -474,12 +724,47 @@ export default function DashboardPage() {
       
       <main className="pt-32 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto max-w-7xl">
+          {/* Selector de Tipo de Inspección */}
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl p-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <span className="text-gray-400 text-sm font-medium">Monitorear:</span>
+              <div className="flex rounded-xl overflow-hidden border border-white/10">
+                <button
+                  onClick={() => { setTipoInspeccion('preoperacional'); setCurrentPage(1); setSelectedInspection(null); setSelectedInspeccionVehicular(null); }}
+                  className={`px-6 py-3 text-sm font-semibold transition-all flex items-center gap-2 ${
+                    tipoInspeccion === 'preoperacional'
+                      ? 'bg-yellow-500 text-black'
+                      : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                  Inspecciones Preoperacionales
+                </button>
+                <button
+                  onClick={() => { setTipoInspeccion('vehicular'); setCurrentPage(1); setSelectedInspection(null); setSelectedInspeccionVehicular(null); }}
+                  className={`px-6 py-3 text-sm font-semibold transition-all flex items-center gap-2 ${
+                    tipoInspeccion === 'vehicular'
+                      ? 'bg-yellow-500 text-black'
+                      : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  Inspecciones Vehiculares
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Header */}
           <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl p-6 mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
               <div className="mb-4 lg:mb-0">
                 <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-300 bg-clip-text text-transparent mb-2">
-                  Dashboard Preoperativos
+                  {tipoInspeccion === 'preoperacional' ? 'Dashboard Preoperativos' : 'Dashboard Vehiculares'}
                 </h1>
                 <p className="text-gray-300">
                   Bienvenido, <span className="text-yellow-400 font-semibold">{user?.nombre}</span>
@@ -488,64 +773,129 @@ export default function DashboardPage() {
               <div className="flex items-center space-x-4">
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Total inspecciones</p>
-                  <p className="text-2xl font-bold text-white">{inspecciones.length}</p>
+                  <p className="text-2xl font-bold text-white">
+                    {tipoInspeccion === 'preoperacional' ? inspecciones.length : inspeccionesVehiculares.length}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Estadísticas */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">
-              <h3 className="text-sm font-medium text-gray-400 mb-1">Hoy</h3>
-              <p className="text-2xl font-bold text-white">
-                {inspecciones.filter(insp => {
-                  if (!insp.createdAt) return false;
-                  const created = new Date(insp.createdAt);
-                  const now = new Date();
-                  return created.toDateString() === now.toDateString();
-                }).length}
-              </p>
-            </div>
-            
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">
-              <h3 className="text-sm font-medium text-gray-400 mb-1">Esta Semana</h3>
-              <p className="text-2xl font-bold text-white">
-                {inspecciones.filter(insp => {
-                  if (!insp.createdAt) return false;
-                  const created = new Date(insp.createdAt);
-                  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                  return created >= weekAgo;
-                }).length}
-              </p>
-            </div>
-            
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">
-              <h3 className="text-sm font-medium text-gray-400 mb-1">Este Mes</h3>
-              <p className="text-2xl font-bold text-white">
-                {inspecciones.filter(insp => {
-                  if (!insp.createdAt) return false;
-                  const created = new Date(insp.createdAt);
-                  const now = new Date();
-                  return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-                }).length}
-              </p>
-            </div>
+          {/* Contenido según tipo de inspección */}
+          {tipoInspeccion === 'preoperacional' ? (
+            <>
+              {/* Estadísticas Preoperacionales */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-1">Hoy</h3>
+                  <p className="text-2xl font-bold text-white">
+                    {inspecciones.filter(insp => {
+                      if (!insp.createdAt) return false;
+                      const created = new Date(insp.createdAt);
+                      const now = new Date();
+                      return created.toDateString() === now.toDateString();
+                    }).length}
+                  </p>
+                </div>
+                
+                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-1">Esta Semana</h3>
+                  <p className="text-2xl font-bold text-white">
+                    {inspecciones.filter(insp => {
+                      if (!insp.createdAt) return false;
+                      const created = new Date(insp.createdAt);
+                      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                      return created >= weekAgo;
+                    }).length}
+                  </p>
+                </div>
+                
+                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-1">Este Mes</h3>
+                  <p className="text-2xl font-bold text-white">
+                    {inspecciones.filter(insp => {
+                      if (!insp.createdAt) return false;
+                      const created = new Date(insp.createdAt);
+                      const now = new Date();
+                      return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+                    }).length}
+                  </p>
+                </div>
 
-            <div className="backdrop-blur-xl bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
-              <h3 className="text-sm font-medium text-yellow-400 mb-1">Pendientes</h3>
-              <p className="text-2xl font-bold text-yellow-400">
-                {inspecciones.filter(insp => insp.estadoPreoperacional === 'Solicitado').length}
-              </p>
-            </div>
+                <div className="backdrop-blur-xl bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-yellow-400 mb-1">Pendientes</h3>
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {inspecciones.filter(insp => insp.estadoPreoperacional === 'Solicitado').length}
+                  </p>
+                </div>
 
-            <div className="backdrop-blur-xl bg-green-500/10 border border-green-500/20 rounded-xl p-4">
-              <h3 className="text-sm font-medium text-green-400 mb-1">Aprobadas</h3>
-              <p className="text-2xl font-bold text-green-400">
-                {inspecciones.filter(insp => insp.estadoPreoperacional === 'Aprobado').length}
-              </p>
-            </div>
-          </div>
+                <div className="backdrop-blur-xl bg-green-500/10 border border-green-500/20 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-green-400 mb-1">Aprobadas</h3>
+                  <p className="text-2xl font-bold text-green-400">
+                    {inspecciones.filter(insp => insp.estadoPreoperacional === 'Aprobado').length}
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Estadísticas Vehiculares */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-1">Hoy</h3>
+                  <p className="text-2xl font-bold text-white">
+                    {inspeccionesVehiculares.filter(insp => {
+                      if (!insp.fechaInspeccion) return false;
+                      const created = new Date(insp.fechaInspeccion);
+                      const now = new Date();
+                      return created.toDateString() === now.toDateString();
+                    }).length}
+                  </p>
+                </div>
+                
+                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-1">Esta Semana</h3>
+                  <p className="text-2xl font-bold text-white">
+                    {inspeccionesVehiculares.filter(insp => {
+                      if (!insp.fechaInspeccion) return false;
+                      const created = new Date(insp.fechaInspeccion);
+                      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                      return created >= weekAgo;
+                    }).length}
+                  </p>
+                </div>
+                
+                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-1">Este Mes</h3>
+                  <p className="text-2xl font-bold text-white">
+                    {inspeccionesVehiculares.filter(insp => {
+                      if (!insp.fechaInspeccion) return false;
+                      const created = new Date(insp.fechaInspeccion);
+                      const now = new Date();
+                      return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+                    }).length}
+                  </p>
+                </div>
+
+                <div className="backdrop-blur-xl bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-yellow-400 mb-1">Pendientes</h3>
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {inspeccionesVehiculares.filter(insp => insp.estadoInspeccion === 'Pendiente').length}
+                  </p>
+                </div>
+
+                <div className="backdrop-blur-xl bg-green-500/10 border border-green-500/20 rounded-xl p-4">
+                  <h3 className="text-sm font-medium text-green-400 mb-1">Promedio Cumplimiento</h3>
+                  <p className="text-2xl font-bold text-green-400">
+                    {inspeccionesVehiculares.length > 0 
+                      ? (inspeccionesVehiculares.reduce((acc, insp) => acc + parseFloat(insp.porcentajeCumplimiento.replace('%', '') || '0'), 0) / inspeccionesVehiculares.length).toFixed(1) + '%'
+                      : '0%'
+                    }
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Controles y Filtros */}
           <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4 mb-6">
@@ -612,6 +962,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Lista de Inspecciones */}
+          {tipoInspeccion === 'preoperacional' ? (
           <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
             {inspecciones.length === 0 ? (
               <div className="text-center py-16">
@@ -722,6 +1073,8 @@ export default function DashboardPage() {
                                   setReviewAction(null);
                                   setReviewObservaciones('');
                                   setFirmaHSEQData(null);
+                                  setGpsError(null);
+                                  setGpsData(null);
                                 }}
                                 className="block text-yellow-400 hover:text-yellow-300 text-sm font-medium transition-colors"
                               >
@@ -778,6 +1131,8 @@ export default function DashboardPage() {
                               setReviewAction(null);
                               setReviewObservaciones('');
                               setFirmaHSEQData(null);
+                              setGpsError(null);
+                              setGpsData(null);
                             }}
                             className="w-full mt-4 bg-yellow-400 text-black py-2 px-4 rounded-lg hover:bg-yellow-500 transition-colors text-sm font-medium"
                           >
@@ -838,6 +1193,229 @@ export default function DashboardPage() {
               </>
             )}
           </div>
+          ) : (
+          /* Lista de Inspecciones Vehiculares */
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+            {inspeccionesVehiculares.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-16 h-16 bg-yellow-400/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <p className="text-gray-400 text-lg mb-2">No hay inspecciones vehiculares registradas</p>
+                <p className="text-gray-500">Las inspecciones aparecerán aquí una vez que se registren</p>
+              </div>
+            ) : filteredInspeccionesVehiculares.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-gray-400 text-lg">No se encontraron inspecciones con los filtros aplicados</p>
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilterBy('all');
+                  }}
+                  className="mt-4 px-4 py-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors"
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            ) : (
+              <>
+                {viewMode === 'table' ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-white/5">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Fecha</th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Conductor</th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Vehículo</th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Documentos</th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Cumplimiento</th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Estado</th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {paginatedInspeccionesVehiculares.map((insp) => (
+                          <tr key={insp.id} className="hover:bg-white/5 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-white">
+                                {insp.fechaInspeccion ? new Date(insp.fechaInspeccion + (insp.fechaInspeccion.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('es-ES', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
+                                }) : 'Sin fecha'}
+                              </div>
+                              {insp.codigoInspeccion && (
+                                <div className="text-xs text-yellow-400/70">{insp.codigoInspeccion}</div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm font-medium text-white">{insp.conductorNombre || 'Sin nombre'}</div>
+                              <div className="text-sm text-gray-400">CC: {insp.conductorCedula || 'Sin cédula'}</div>
+                              <div className="text-xs text-gray-500">RH: {insp.conductorRh || 'N/A'}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm font-medium text-white">{insp.vehiculoPlaca || 'Sin placa'}</div>
+                              <div className="text-sm text-gray-400">{insp.vehiculoMarca} {insp.vehiculoLinea}</div>
+                              <div className="text-xs text-gray-500">Modelo: {insp.vehiculoModelo || 'N/A'}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-gray-400">SOAT:</span>
+                                  {getStatusBadge(insp.soatCumple)}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-gray-400">RTM:</span>
+                                  {getStatusBadge(insp.rtmCumple)}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-gray-400">Licencia:</span>
+                                  {getStatusBadge(insp.licenciaCumple)}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <div className={`text-lg font-bold ${
+                                    parseFloat(insp.porcentajeCumplimiento?.replace('%', '') || '0') >= 90 
+                                      ? 'text-green-400' 
+                                      : parseFloat(insp.porcentajeCumplimiento?.replace('%', '') || '0') >= 70 
+                                        ? 'text-yellow-400' 
+                                        : 'text-red-400'
+                                  }`}>
+                                    {insp.porcentajeCumplimiento || '0%'}
+                                  </div>
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  <span className="text-green-400">{insp.totalItemsCumple}</span> / 
+                                  <span className="text-red-400">{insp.totalItemsNoCumple}</span> items
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              {getEstadoBadge(insp.estadoInspeccion)}
+                              {insp.nombreHseq && (
+                                <div className="text-xs text-gray-500 mt-1">Por: {insp.nombreHseq}</div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap space-y-1">
+                              <button
+                                onClick={() => {
+                                  setSelectedInspeccionVehicular(insp);
+                                }}
+                                className="block text-yellow-400 hover:text-yellow-300 text-sm font-medium transition-colors"
+                              >
+                                Ver detalles
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {paginatedInspeccionesVehiculares.map((insp) => (
+                      <div key={insp.id} className="bg-white/5 border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-colors">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">{insp.conductorNombre || 'Sin nombre'}</h3>
+                            <p className="text-sm text-gray-400">CC: {insp.conductorCedula}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-gray-500 mb-1">
+                              {insp.fechaInspeccion ? new Date(insp.fechaInspeccion + (insp.fechaInspeccion.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('es-ES') : 'Sin fecha'}
+                            </div>
+                            {getEstadoBadge(insp.estadoInspeccion)}
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm text-gray-400 mb-1">Vehículo</p>
+                            <p className="text-white">{insp.vehiculoPlaca} - {insp.vehiculoMarca}</p>
+                          </div>
+                          
+                          <div>
+                            <p className="text-sm text-gray-400 mb-2">Cumplimiento</p>
+                            <div className={`text-xl font-bold ${
+                              parseFloat(insp.porcentajeCumplimiento?.replace('%', '') || '0') >= 90 
+                                ? 'text-green-400' 
+                                : parseFloat(insp.porcentajeCumplimiento?.replace('%', '') || '0') >= 70 
+                                  ? 'text-yellow-400' 
+                                  : 'text-red-400'
+                            }`}>
+                              {insp.porcentajeCumplimiento || '0%'}
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              setSelectedInspeccionVehicular(insp);
+                            }}
+                            className="w-full mt-4 bg-yellow-400 text-black py-2 px-4 rounded-lg hover:bg-yellow-500 transition-colors text-sm font-medium"
+                          >
+                            Ver detalles completos
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Paginación */}
+                {totalPagesVehiculares > 1 && (
+                  <div className="px-6 py-4 bg-white/5 border-t border-white/10">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-400">
+                        Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, filteredInspeccionesVehiculares.length)} de {filteredInspeccionesVehiculares.length} inspecciones
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                        >
+                          Anterior
+                        </button>
+                        
+                        <div className="flex items-center space-x-1">
+                          {Array.from({ length: Math.min(5, totalPagesVehiculares) }, (_, i) => {
+                            const pageNum = i + 1;
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                                  currentPage === pageNum
+                                    ? 'bg-yellow-400 text-black'
+                                    : 'bg-white/5 text-white hover:bg-white/10'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPagesVehiculares))}
+                          disabled={currentPage === totalPagesVehiculares}
+                          className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                        >
+                          Siguiente
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          )}
         </div>
       </main>
 
@@ -856,7 +1434,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <button
-                onClick={() => { setSelectedInspection(null); setReviewMode(false); }}
+                onClick={() => { setSelectedInspection(null); setReviewMode(false); setGpsError(null); setGpsData(null); }}
                 className="text-gray-400 hover:text-white transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1160,6 +1738,47 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* Datos GPS */}
+              <div className="bg-white/5 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-yellow-400 mb-3">Datos GPS</h3>
+                <div className="space-y-3">
+                  <p className="text-gray-400 text-sm">
+                    Los datos GPS del conductor están almacenados de forma segura y encriptados.
+                  </p>
+                  <button
+                    onClick={() => fetchGPSData(selectedInspection.id)}
+                    disabled={gpsLoading}
+                    className="inline-flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    {gpsLoading ? (
+                      <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                        </svg>
+                        <span>Consultando datos del conductor...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>Ver Datos GPS del Conductor</span>
+                      </>
+                    )}
+                  </button>
+                  {gpsError && (
+                    <div className="flex items-center space-x-2 text-yellow-400 text-sm mt-2">
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{gpsError}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Link al PDF */}
               {selectedInspection.docPreoperacional && (
                 <div className="bg-white/5 rounded-xl p-4">
@@ -1175,6 +1794,333 @@ export default function DashboardPage() {
                   </a>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalles Inspección Vehicular */}
+      {selectedInspeccionVehicular && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-slate-900 border-b border-white/10 px-6 py-4 flex items-center justify-between z-10">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Detalles de Inspección Vehicular</h2>
+                <div className="flex items-center space-x-3 mt-1">
+                  {selectedInspeccionVehicular.codigoInspeccion && (
+                    <span className="text-xs text-gray-400">{selectedInspeccionVehicular.codigoInspeccion}</span>
+                  )}
+                  {getEstadoBadge(selectedInspeccionVehicular.estadoInspeccion)}
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedInspeccionVehicular(null)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-8">
+              {/* Información General */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white/5 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-yellow-400 mb-3">Información del Conductor</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Nombre:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.conductorNombre}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Cédula:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.conductorCedula}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Edad:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.conductorEdad} años</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">RH:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.conductorRh}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">EPS:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.conductorEps}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">ARL:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.conductorArl}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white/5 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-yellow-400 mb-3">Información del Vehículo</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Placa:</span>
+                      <span className="text-white font-semibold">{selectedInspeccionVehicular.vehiculoPlaca}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Marca:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.vehiculoMarca}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Línea:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.vehiculoLinea}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Modelo:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.vehiculoModelo}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Kilometraje:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.kilometrajeInicial} km</span>
+                    </div>
+                  </div>
+
+                  {selectedInspeccionVehicular.remolquePlaca && (
+                    <>
+                      <h4 className="text-sm font-semibold text-yellow-400/70 mt-4 mb-2">Remolque</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Placa:</span>
+                          <span className="text-white">{selectedInspeccionVehicular.remolquePlaca}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Marca:</span>
+                          <span className="text-white">{selectedInspeccionVehicular.remolqueMarca || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Clase:</span>
+                          <span className="text-white">{selectedInspeccionVehicular.remolqueClase || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Estado de Documentos */}
+              <div className="bg-white/5 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-yellow-400 mb-4">Estado de Documentos</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-400 mb-2">SOAT</p>
+                    {getStatusBadge(selectedInspeccionVehicular.soatCumple)}
+                    {selectedInspeccionVehicular.soatVencimiento && (
+                      <p className="text-xs text-gray-500 mt-1">Vence: {selectedInspeccionVehicular.soatVencimiento}</p>
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-400 mb-2">RTM</p>
+                    {getStatusBadge(selectedInspeccionVehicular.rtmCumple)}
+                    {selectedInspeccionVehicular.rtmVencimiento && (
+                      <p className="text-xs text-gray-500 mt-1">Vence: {selectedInspeccionVehicular.rtmVencimiento}</p>
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-400 mb-2">Póliza</p>
+                    {getStatusBadge(selectedInspeccionVehicular.polizaCumple)}
+                    {selectedInspeccionVehicular.polizaVencimiento && (
+                      <p className="text-xs text-gray-500 mt-1">Vence: {selectedInspeccionVehicular.polizaVencimiento}</p>
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-400 mb-2">Licencia</p>
+                    {getStatusBadge(selectedInspeccionVehicular.licenciaCumple)}
+                    {selectedInspeccionVehicular.categoriasLicencia && (
+                      <p className="text-xs text-gray-500 mt-1">Cat: {selectedInspeccionVehicular.categoriasLicencia}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Resumen de Cumplimiento */}
+              <div className="bg-white/5 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-yellow-400 mb-3">Resumen de Cumplimiento</h3>
+                <div className="flex items-center justify-center space-x-8">
+                  <div className="text-center px-6 py-4 rounded-lg bg-green-500/20">
+                    <p className="text-3xl font-bold text-green-400">
+                      {selectedInspeccionVehicular.totalItemsCumple}
+                    </p>
+                    <p className="text-sm text-gray-400">Items Cumplen</p>
+                  </div>
+                  <div className={`text-center px-6 py-4 rounded-lg ${selectedInspeccionVehicular.totalItemsNoCumple === 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                    <p className={`text-3xl font-bold ${selectedInspeccionVehicular.totalItemsNoCumple === 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {selectedInspeccionVehicular.totalItemsNoCumple}
+                    </p>
+                    <p className="text-sm text-gray-400">Items No Cumplen</p>
+                  </div>
+                  <div className={`text-center px-6 py-4 rounded-lg ${
+                    parseFloat(selectedInspeccionVehicular.porcentajeCumplimiento?.replace('%', '') || '0') >= 90 
+                      ? 'bg-green-500/20' 
+                      : parseFloat(selectedInspeccionVehicular.porcentajeCumplimiento?.replace('%', '') || '0') >= 70 
+                        ? 'bg-yellow-500/20' 
+                        : 'bg-red-500/20'
+                  }`}>
+                    <p className={`text-3xl font-bold ${
+                      parseFloat(selectedInspeccionVehicular.porcentajeCumplimiento?.replace('%', '') || '0') >= 90 
+                        ? 'text-green-400' 
+                        : parseFloat(selectedInspeccionVehicular.porcentajeCumplimiento?.replace('%', '') || '0') >= 70 
+                          ? 'text-yellow-400' 
+                          : 'text-red-400'
+                    }`}>
+                      {selectedInspeccionVehicular.porcentajeCumplimiento || '0%'}
+                    </p>
+                    <p className="text-sm text-gray-400">Porcentaje</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Condiciones */}
+              <div className="bg-white/5 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-yellow-400 mb-3">Condiciones de Conducción</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-400 mb-2">Horas de Sueño</p>
+                    <p className="text-lg font-semibold text-white">{selectedInspeccionVehicular.horasDormir || 'N/A'} horas</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Observaciones */}
+              {selectedInspeccionVehicular.observacionesGenerales && (
+                <div className="bg-white/5 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-yellow-400 mb-3">Observaciones Generales</h3>
+                  <p className="text-white">{selectedInspeccionVehicular.observacionesGenerales}</p>
+                </div>
+              )}
+
+              {/* Información de Revisión HSEQ (si ya fue revisado) */}
+              {selectedInspeccionVehicular.estadoInspeccion !== 'Pendiente' && selectedInspeccionVehicular.nombreHseq && (
+                <div className={`rounded-xl p-4 ${selectedInspeccionVehicular.estadoInspeccion === 'Aprobado' ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'}`}>
+                  <h3 className="text-lg font-semibold text-yellow-400 mb-3">Revisión HSEQ</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Revisado por:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.nombreHseq}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Fecha de revisión:</span>
+                      <span className="text-white">{selectedInspeccionVehicular.fechaRevisionHseq}</span>
+                    </div>
+                    {selectedInspeccionVehicular.observacionesHseq && (
+                      <div className="mt-3">
+                        <span className="text-gray-400">Observaciones:</span>
+                        <p className="text-white mt-1">{selectedInspeccionVehicular.observacionesHseq}</p>
+                      </div>
+                    )}
+                    {selectedInspeccionVehicular.firmaHseq && (
+                      <div className="mt-3">
+                        <span className="text-gray-400">Firma:</span>
+                        <img src={selectedInspeccionVehicular.firmaHseq} alt="Firma HSEQ" className="mt-2 max-w-[200px] bg-white rounded p-2" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Datos GPS */}
+      {showGPSModal && gpsData && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-md w-full">
+            <div className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Datos GPS Desencriptados</h2>
+                  <p className="text-xs text-gray-400">Información confidencial</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowGPSModal(false);
+                  setGpsData(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                <div className="flex items-center space-x-2 text-yellow-400 text-sm">
+                  <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>Estos datos son confidenciales. No los comparta con terceros.</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {gpsData.nombre && (
+                  <div className="bg-white/5 rounded-lg p-4">
+                    <label className="text-xs text-gray-400 uppercase tracking-wider">Nombre GPS</label>
+                    <p className="text-white font-medium mt-1">{gpsData.nombre}</p>
+                  </div>
+                )}
+                
+                <div className="bg-white/5 rounded-lg p-4">
+                  <label className="text-xs text-gray-400 uppercase tracking-wider">Usuario</label>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-white font-mono">{gpsData.usuario || 'No registrado'}</p>
+                    {gpsData.usuario && (
+                      <button
+                        onClick={() => navigator.clipboard.writeText(gpsData.usuario)}
+                        className="text-yellow-400 hover:text-yellow-300 text-sm"
+                        title="Copiar"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="bg-white/5 rounded-lg p-4">
+                  <label className="text-xs text-gray-400 uppercase tracking-wider">Contraseña</label>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-white font-mono">{gpsData.password || 'No registrada'}</p>
+                    {gpsData.password && (
+                      <button
+                        onClick={() => navigator.clipboard.writeText(gpsData.password)}
+                        className="text-yellow-400 hover:text-yellow-300 text-sm"
+                        title="Copiar"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowGPSModal(false);
+                  setGpsData(null);
+                }}
+                className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-lg transition-colors font-medium"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
