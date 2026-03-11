@@ -98,16 +98,26 @@ export function getInspeccionVehicularConfig() {
   const apiKey = process.env.AIRTABLE_INSPECCION_VEHICULAR_API_KEY;
   const baseId = process.env.AIRTABLE_INSPECCION_VEHICULAR_BASE_ID;
   const tableId = process.env.AIRTABLE_INSPECCION_VEHICULAR_TABLE_ID;
-  
-  if (!apiKey || !baseId) {
-    console.warn('⚠️ AIRTABLE INSPECCION VEHICULAR: Credenciales no configuradas. Revisa las variables de entorno.');
+  const tableItemsPreop    = process.env.AIRTABLE_ITEMS_PREOP_TABLE_ID;
+  const tableItemsKit      = process.env.AIRTABLE_ITEMS_KIT_TABLE_ID;
+  const tableItemsBotiquin = process.env.AIRTABLE_ITEMS_BOTIQUIN_TABLE_ID;
+  const tableItemsExtintor = process.env.AIRTABLE_ITEMS_EXTINTOR_TABLE_ID;
+
+  if (!apiKey || !baseId || !tableId || !tableItemsPreop || !tableItemsKit || !tableItemsBotiquin || !tableItemsExtintor) {
+    console.warn('⚠️ AIRTABLE INSPECCION VEHICULAR: Variables de entorno incompletas. Revisa .env.local.');
   }
-  
+
   return {
     API_KEY: apiKey || '',
     BASE_ID: baseId || '',
-    TABLE_ID: tableId || '',
-    TABLE_NAME: process.env.AIRTABLE_INSPECCION_VEHICULAR_TABLE_NAME || 'Inspeccion Vehiccular',
+    // Tabla principal (encabezado)
+    TABLE_ID:   tableId || '',
+    TABLE_NAME: process.env.AIRTABLE_INSPECCION_VEHICULAR_TABLE_NAME || '',
+    // Tablas hijas normalizadas (4NF)
+    TABLE_ITEMS_PREOP:    tableItemsPreop    || '',
+    TABLE_ITEMS_KIT:      tableItemsKit      || '',
+    TABLE_ITEMS_BOTIQUIN: tableItemsBotiquin || '',
+    TABLE_ITEMS_EXTINTOR: tableItemsExtintor || '',
     BASE_URL: 'https://api.airtable.com/v0',
   } as const;
 }
@@ -232,6 +242,7 @@ export const INSPECCION_VEHICULAR_FIELDS = {
   VERSION_FORMATO: 'Version Formato',
   
   // Conductor
+  CONDUCTOR_ID: 'Conductor ID',
   CONDUCTOR_CEDULA: 'Conductor Cedula',
   CONDUCTOR_NOMBRE: 'Conductor Nombre',
   CONDUCTOR_EDAD: 'Conductor Edad',
@@ -531,6 +542,58 @@ export const INSPECCION_VEHICULAR_FIELDS = {
   EXT_53_OBS: 'Ext 53 Obs',
   EXT_FECHA_ACTUAL: 'Ext Fecha Actual',
   EXT_FECHA_PROXIMA_RECARGA: 'Ext Fecha Proxima Recarga',
+  
+  // Agregados estado (kit/botiquín/extintor)
+  TOTAL_BUENO: 'Total Bueno',
+  TOTAL_REGULAR: 'Total Regular',
+  TOTAL_MALO: 'Total Malo',
+  TOTAL_NO_TIENE: 'Total No Tiene',
+} as const;
+
+// ===========================================
+// CAMPOS DE LAS TABLAS HIJAS (4NF)
+// Cada fila es un ítem de inspección. Se relacionan con la
+// tabla principal mediante el campo "Inspeccion" (linked record).
+// ===========================================
+
+/** Items Preoperacional — tabla tblt1u5HVdWZfWrYU */
+export const ITEMS_PREOP_FIELDS = {
+  ITEM_NOMBRE: 'Item Nombre',
+  ITEM_NUMERO: 'Item Numero',
+  CATEGORIA: 'Categoria',      // Seguridad | Generales | Mecanico | Correas | Higiene | Salud
+  CUMPLE: 'Cumple',            // Cumple | No Cumple | N/A
+  OBSERVACION: 'Observacion',
+  INSPECCION: 'Inspeccion',    // linked record → Inspeccion Vehiccular
+} as const;
+
+/** Items Kit Derrame — tabla tblJVw6v3q0KIj61D */
+export const ITEMS_KIT_FIELDS = {
+  ITEM_NOMBRE: 'Item Nombre',
+  ITEM_NUMERO: 'Item Numero',
+  TIPO_ITEM: 'Tipo Item',      // Material | Pregunta de Verificacion
+  ESTADO: 'Estado',            // B | R | M | NT
+  OBSERVACION: 'Observacion',
+  INSPECCION: 'Inspeccion',
+} as const;
+
+/** Items Botiquín — tabla tblMOa81d8VSIL4bU */
+export const ITEMS_BOTIQUIN_FIELDS = {
+  ITEM_NOMBRE: 'Item Nombre',
+  ITEM_NUMERO: 'Item Numero',
+  ESTADO: 'Estado',            // B | R | M | NT
+  CANTIDAD: 'Cantidad',
+  FECHA_VENCIMIENTO: 'Fecha Vencimiento',
+  OBSERVACION: 'Observacion',
+  INSPECCION: 'Inspeccion',
+} as const;
+
+/** Items Extintor — tabla tbl3jzyUo8KM4KBXQ */
+export const ITEMS_EXTINTOR_FIELDS = {
+  ITEM_NOMBRE: 'Item Nombre',
+  ITEM_NUMERO: 'Item Numero',
+  ESTADO: 'Estado',            // B | R | M
+  OBSERVACION: 'Observacion',
+  INSPECCION: 'Inspeccion',
 } as const;
 
 // ===========================================

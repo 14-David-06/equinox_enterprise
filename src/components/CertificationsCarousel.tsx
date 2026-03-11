@@ -6,32 +6,32 @@ import Image from 'next/image';
 const certifications = [
   {
     name: 'ISO 9001',
-    image: '/images/certifications/iso9001.png',
+    image: '/images/certifications/ISO%209001.jpeg',
     description: 'Sistema de Gestión de Calidad'
   },
   {
     name: 'ISO 14001',
-    image: '/images/certifications/14001.png',
+    image: '/images/certifications/ISO%2014001.jpeg',
     description: 'Sistema de Gestión Ambiental'
   },
   {
     name: 'ISO 45001',
-    image: '/images/certifications/ISO-45001.png',
+    image: '/images/certifications/ISO%2045001.jpeg',
     description: 'Sistema de Gestión de Seguridad y Salud Ocupacional'
   },
   {
     name: 'ISO 39001',
-    image: '/images/certifications/iso39001.jpeg',
+    image: '/images/certifications/ISO%2039001.jpeg',
     description: 'Sistema de Gestión de Seguridad Vial'
   },
   {
     name: 'NORSOK S-006',
-    image: '/images/certifications/norsok-s006.png',
+    image: '/images/certifications/NORSONK%20S-006.jpeg',
     description: 'Estándar Noruego para Servicios de HSE'
   },
   {
     name: 'Ministerio de Transporte',
-    image: '/images/certifications/Logo_Ministerio_de_Transporte_(2022-2026).png',
+    image: '/images/certifications/MIN%20TRANSPORTE.jpeg',
     description: 'Habilitado por el Ministerio de Transporte'
   }
 ];

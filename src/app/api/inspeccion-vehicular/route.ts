@@ -1,146 +1,189 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getInspeccionVehicularConfig, INSPECCION_VEHICULAR_FIELDS } from '@/lib/airtable-config';
+import {
+  getInspeccionVehicularConfig,
+  INSPECCION_VEHICULAR_FIELDS,
+  ITEMS_PREOP_FIELDS,
+  ITEMS_KIT_FIELDS,
+  ITEMS_BOTIQUIN_FIELDS,
+  ITEMS_EXTINTOR_FIELDS,
+} from '@/lib/airtable-config';
 
 // ===========================================
-// FUNCIONES AUXILIARES PARA AIRTABLE
+// CATÁLOGO DE ÍTEMS (single source of truth)
+// Replica los arreglos del formulario para que la API
+// sea auto-contenida (no depende del cliente).
 // ===========================================
 
-async function createAirtableRecord(baseId: string, tableName: string, apiKey: string, fields: Record<string, unknown>) {
-  const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}`;
-  
-  const response = await fetch(url, {
+type CategoriaPreop = 'Seguridad' | 'Generales' | 'Mecanico' | 'Correas' | 'Higiene' | 'Salud';
+
+interface CatalogoPreop { id: number; nombre: string; categoria: CategoriaPreop; }
+interface CatalogoKit   { id: number; nombre: string; tipo: 'Material' | 'Pregunta de Verificacion'; }
+interface CatalogoBotiquin { id: number; nombre: string; cantidadEstandar: number; tieneVencimiento: boolean; }
+interface CatalogoExtintor { id: number; nombre: string; }
+
+const CATALOGO_PREOP: CatalogoPreop[] = [
+  { id: 1,  nombre: 'Extintor de Incendios (20 libras 2 unidades)', categoria: 'Seguridad' },
+  { id: 2,  nombre: 'Equipo de Carretera (Triángulos, Conos, Chaleco Reflectante, Linterna, Manila, Gato, Cruceta)', categoria: 'Seguridad' },
+  { id: 3,  nombre: 'Botiquín de primeros auxilios', categoria: 'Seguridad' },
+  { id: 4,  nombre: 'Cinturones de seguridad operativos', categoria: 'Seguridad' },
+  { id: 5,  nombre: 'Bocina (claxon) funcionando correctamente', categoria: 'Seguridad' },
+  { id: 6,  nombre: 'Luces (altas, bajas, direccionales)', categoria: 'Seguridad' },
+  { id: 7,  nombre: 'Espejos (laterales) y lente angular en buen estado', categoria: 'Seguridad' },
+  { id: 8,  nombre: 'Papeles retrovisores sin daños y bien ajustados', categoria: 'Seguridad' },
+  { id: 9,  nombre: 'Señalización adecuada en el tractocamión (reflectivos, calcomanías reglamentarias)', categoria: 'Generales' },
+  { id: 10, nombre: 'Estado general del Tanque (Sin fugas)', categoria: 'Generales' },
+  { id: 11, nombre: 'Tanque con tapa en buen estado', categoria: 'Generales' },
+  { id: 12, nombre: 'Estado y limpieza de la cabina', categoria: 'Generales' },
+  { id: 13, nombre: 'Estado general de las llantas (desgaste uniforme, presión correcta)', categoria: 'Generales' },
+  { id: 14, nombre: 'Llanta de repuesto', categoria: 'Generales' },
+  { id: 15, nombre: 'Estado de los rines y contrapesos (sin deformaciones ni faltantes)', categoria: 'Generales' },
+  { id: 16, nombre: 'Sistema de frenos (inspección visual: pedal, fugas de aire o hidráulicas)', categoria: 'Generales' },
+  { id: 17, nombre: 'Freno de estacionamiento (de mano)', categoria: 'Generales' },
+  { id: 18, nombre: 'Sistema de dirección (sin ruidos, sin holguras)', categoria: 'Generales' },
+  { id: 19, nombre: 'Estado y funcionamiento del motor (nivel de aceite, fugas de aceite o refrigerante, ruidos anormales)', categoria: 'Generales' },
+  { id: 20, nombre: 'Nivel de fluidos (aceite, refrigerante, líquido de frenos)', categoria: 'Generales' },
+  { id: 21, nombre: 'Medición de suspensión y amortiguadores', categoria: 'Generales' },
+  { id: 22, nombre: 'Estado y funcionamiento de luces (delanteras, traseras, direccionales y de freno)', categoria: 'Generales' },
+  { id: 23, nombre: 'Ausencia de fugas de fluidos en general', categoria: 'Generales' },
+  { id: 24, nombre: 'Herramientas básicas y gato hidráulico presentes', categoria: 'Generales' },
+  { id: 25, nombre: 'Punto de anclaje fijo', categoria: 'Generales' },
+  { id: 26, nombre: 'Cable de acero', categoria: 'Generales' },
+  { id: 27, nombre: 'Estado de los espejos', categoria: 'Generales' },
+  { id: 28, nombre: 'Listado del torque', categoria: 'Generales' },
+  { id: 29, nombre: 'Caja de cambios', categoria: 'Mecanico' },
+  { id: 30, nombre: 'Estado de amortiguadores y resortes (muelles o ballestas)', categoria: 'Mecanico' },
+  { id: 31, nombre: 'Revisión de componentes de suspensión (bujes, pernos, terminales)', categoria: 'Mecanico' },
+  { id: 32, nombre: 'Nivel y estado del refrigerante', categoria: 'Mecanico' },
+  { id: 33, nombre: 'Revisión de fugas en mangueras y sellantes', categoria: 'Mecanico' },
+  { id: 34, nombre: 'Funcionamiento de frenos de emergencia y de servicio', categoria: 'Mecanico' },
+  { id: 35, nombre: 'Estado de la batería', categoria: 'Mecanico' },
+  { id: 36, nombre: 'Lubricación y engrase general', categoria: 'Mecanico' },
+  { id: 37, nombre: 'Fugas en el sistema de escape, humo excesivo o color anormal', categoria: 'Mecanico' },
+  { id: 38, nombre: 'Correas (ventilador, alternador, compresor) sin grietas o desgaste excesivo', categoria: 'Correas' },
+  { id: 39, nombre: 'Realizar desinfección y limpieza a la cabina del vehículo', categoria: 'Higiene' },
+  { id: 40, nombre: 'Antes de la jornada laboral tuvo un descanso apropiado para desarrollar su labor de manera segura', categoria: 'Salud' },
+  { id: 41, nombre: 'Se encuentra bajo algún tratamiento médico y/o ha ingerido algún medicamento', categoria: 'Salud' },
+  { id: 42, nombre: '¿Presenta algún trastorno de ansiedad o depresión?', categoria: 'Salud' },
+  { id: 43, nombre: '¿Presenta algún trastorno neurológico o visual? (mareo, vértigo, visión borrosa)', categoria: 'Salud' },
+  { id: 44, nombre: 'Se encuentra en condiciones de salud apropiadas para trabajar', categoria: 'Salud' },
+];
+
+const CATALOGO_KIT: CatalogoKit[] = [
+  { id: 101, nombre: 'Paños Absorbentes', tipo: 'Material' },
+  { id: 102, nombre: 'Barrera Absorbente', tipo: 'Material' },
+  { id: 103, nombre: 'Traje Desechable', tipo: 'Material' },
+  { id: 104, nombre: 'Bolsa Roja para Recoger Residuos Contaminados', tipo: 'Material' },
+  { id: 105, nombre: 'Pala Plástica', tipo: 'Material' },
+  { id: 106, nombre: 'Espátula Plástica', tipo: 'Material' },
+  { id: 107, nombre: 'Guantes de Nitrilo', tipo: 'Material' },
+  { id: 108, nombre: 'Gafas Transparentes de Seguridad', tipo: 'Material' },
+  { id: 109, nombre: 'Cinta de Peligro', tipo: 'Material' },
+  { id: 110, nombre: 'Martillo de Goma', tipo: 'Material' },
+  { id: 111, nombre: 'Recogedor de Mano Plástico', tipo: 'Material' },
+  { id: 112, nombre: 'Respirador un Cartucho o Tapabocas N-95', tipo: 'Material' },
+  { id: 113, nombre: 'Linterna Recargable', tipo: 'Material' },
+  { id: 114, nombre: 'Bolsa Granulado Absorbente', tipo: 'Material' },
+  { id: 115, nombre: 'Masilla Epóxica', tipo: 'Material' },
+  { id: 116, nombre: 'Desengrasante Biodegradable', tipo: 'Material' },
+  { id: 117, nombre: 'Chaleco Antireflectivo', tipo: 'Material' },
+  { id: 118, nombre: 'Conos', tipo: 'Material' },
+  { id: 119, nombre: '¿El responsable del kit control de derrame conoce el procedimiento para usarlo?', tipo: 'Pregunta de Verificacion' },
+  { id: 120, nombre: '¿El kit se encuentra almacenado en un lugar seco y protegido de agentes contaminantes?', tipo: 'Pregunta de Verificacion' },
+  { id: 121, nombre: '¿La caneca o morral donde se guarda el kit se encuentra rotulado o señalizado?', tipo: 'Pregunta de Verificacion' },
+];
+
+const CATALOGO_BOTIQUIN: CatalogoBotiquin[] = [
+  { id: 201, nombre: 'Gasas', cantidadEstandar: 10, tieneVencimiento: true },
+  { id: 202, nombre: 'Esparadrapo', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 203, nombre: 'Bajalenguas', cantidadEstandar: 10, tieneVencimiento: true },
+  { id: 204, nombre: 'Guantes de Latex', cantidadEstandar: 5, tieneVencimiento: true },
+  { id: 205, nombre: 'Aplicadores o Copitos', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 206, nombre: 'Venda Elástica 2X5 Yardas', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 207, nombre: 'Venda Elástica 3X5 Yardas', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 208, nombre: 'Venda Elástica 5X5 Yardas', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 209, nombre: 'Venda de Algodón 3X5 Yardas', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 210, nombre: 'Venda de Algodón 5X5 Yardas', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 211, nombre: 'Yodopovidona (Jabón Quirúrgico)', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 212, nombre: 'Solución Salina 250 cc ó 500 cc', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 213, nombre: 'Tapabocas', cantidadEstandar: 3, tieneVencimiento: true },
+  { id: 214, nombre: 'Alcohol Antiséptico Frasco por 275 ml', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 215, nombre: 'Curas', cantidadEstandar: 5, tieneVencimiento: true },
+  { id: 216, nombre: 'Jeringa de 5 ml', cantidadEstandar: 1, tieneVencimiento: true },
+  { id: 217, nombre: 'Tijeras de Trauma', cantidadEstandar: 1, tieneVencimiento: false },
+  { id: 218, nombre: 'Parche Ocular', cantidadEstandar: 3, tieneVencimiento: true },
+  { id: 219, nombre: 'Termómetro', cantidadEstandar: 1, tieneVencimiento: false },
+  { id: 220, nombre: 'Libreta', cantidadEstandar: 1, tieneVencimiento: false },
+  { id: 221, nombre: 'Lapicero', cantidadEstandar: 1, tieneVencimiento: false },
+  { id: 222, nombre: 'Manual de Emergencia', cantidadEstandar: 1, tieneVencimiento: false },
+];
+
+const CATALOGO_EXTINTOR: CatalogoExtintor[] = [
+  { id: 301, nombre: 'Presión' },
+  { id: 302, nombre: 'Sello de Garantía' },
+  { id: 303, nombre: 'Manómetro' },
+  { id: 304, nombre: 'Estado del Cilindro' },
+  { id: 305, nombre: 'Manija' },
+  { id: 306, nombre: 'Boquilla o Manguera' },
+  { id: 307, nombre: 'Anillo de Seguridad' },
+  { id: 308, nombre: 'Pin de Seguridad' },
+  { id: 309, nombre: 'Pintura' },
+  { id: 310, nombre: 'Tarjeta de Inspección' },
+];
+
+// ===========================================
+// UTILIDADES AIRTABLE
+// ===========================================
+
+async function airtablePost(
+  baseId: string,
+  tableId: string,
+  apiKey: string,
+  fields: Record<string, unknown>
+): Promise<{ id: string; fields: Record<string, unknown> }> {
+  const url = `https://api.airtable.com/v0/${baseId}/${tableId}`;
+  const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields, typecast: true }),
   });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    console.error('Airtable error details:', errorData);
-    throw new Error(`Airtable error: ${response.status} - ${errorData?.error?.message || 'Unknown'}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Airtable ${res.status}: ${err?.error?.message || JSON.stringify(err)}`);
   }
-
-  return response.json();
+  return res.json();
 }
 
-// Mapeo de IDs de items a nombres de campos en Airtable (inspección preoperacional)
-const ITEM_FIELD_MAP: Record<number, { cumple: string; obs: string }> = {
-  1: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_01_EXTINTOR, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_01_OBS },
-  2: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_02_EQUIPO_CARRETERA, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_02_OBS },
-  3: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_03_BOTIQUIN, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_03_OBS },
-  4: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_04_CINTURONES, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_04_OBS },
-  5: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_05_BOCINA, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_05_OBS },
-  6: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_06_LUCES, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_06_OBS },
-  7: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_07_ESPEJOS, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_07_OBS },
-  8: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_08_RETROVISORES, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_08_OBS },
-  9: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_09_SENALIZACION, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_09_OBS },
-  10: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_10_TANQUE, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_10_OBS },
-  11: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_11_TAPA_TANQUE, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_11_OBS },
-  12: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_12_CABINA, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_12_OBS },
-  13: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_13_LLANTAS, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_13_OBS },
-  14: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_14_LLANTA_REPUESTO, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_14_OBS },
-  15: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_15_RINES, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_15_OBS },
-  16: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_16_FRENOS, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_16_OBS },
-  17: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_17_FRENO_MANO, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_17_OBS },
-  18: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_18_DIRECCION, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_18_OBS },
-  19: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_19_MOTOR, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_19_OBS },
-  20: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_20_FLUIDOS, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_20_OBS },
-  21: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_21_SUSPENSION, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_21_OBS },
-  22: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_22_LUCES_FUNC, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_22_OBS },
-  23: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_23_FUGAS, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_23_OBS },
-  24: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_24_HERRAMIENTAS, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_24_OBS },
-  25: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_25_ANCLAJE, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_25_OBS },
-  26: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_26_CABLE_ACERO, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_26_OBS },
-  27: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_27_ESPEJOS_EST, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_27_OBS },
-  28: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_28_TORQUE, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_28_OBS },
-  29: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_29_CAJA_CAMBIOS, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_29_OBS },
-  30: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_30_AMORTIGUADORES, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_30_OBS },
-  31: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_31_COMP_SUSPENSION, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_31_OBS },
-  32: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_32_REFRIGERANTE, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_32_OBS },
-  33: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_33_MANGUERAS, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_33_OBS },
-  34: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_34_FRENOS_EMERG, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_34_OBS },
-  35: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_35_BATERIA, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_35_OBS },
-  36: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_36_LUBRICACION, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_36_OBS },
-  37: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_37_ESCAPE, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_37_OBS },
-  38: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_38_CORREAS, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_38_OBS },
-  39: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_39_LIMPIEZA, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_39_OBS },
-  40: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_40_DESCANSO, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_40_OBS },
-  41: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_41_TRATAMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_41_OBS },
-  42: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_42_ANSIEDAD, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_42_OBS },
-  43: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_43_NEUROLOGICO, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_43_OBS },
-  44: { cumple: INSPECCION_VEHICULAR_FIELDS.ITEM_44_CONDICIONES_SALUD, obs: INSPECCION_VEHICULAR_FIELDS.ITEM_44_OBS },
-};
-
-// Mapeo de IDs de Kit de Derrame a campos en Airtable
-const KIT_DERRAME_FIELD_MAP: Record<number, { estado: string; obs: string }> = {
-  1: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_01_PANOS_ABSORBENTES, obs: INSPECCION_VEHICULAR_FIELDS.KIT_01_OBS },
-  2: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_02_BARRERA_ABSORBENTE, obs: INSPECCION_VEHICULAR_FIELDS.KIT_02_OBS },
-  3: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_03_TRAJE_DESECHABLE, obs: INSPECCION_VEHICULAR_FIELDS.KIT_03_OBS },
-  4: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_04_BOLSA_ROJA, obs: INSPECCION_VEHICULAR_FIELDS.KIT_04_OBS },
-  5: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_05_PALA_PLASTICA, obs: INSPECCION_VEHICULAR_FIELDS.KIT_05_OBS },
-  6: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_06_ESPATULA, obs: INSPECCION_VEHICULAR_FIELDS.KIT_06_OBS },
-  7: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_07_GUANTES_NITRILO, obs: INSPECCION_VEHICULAR_FIELDS.KIT_07_OBS },
-  8: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_08_GAFAS_SEGURIDAD, obs: INSPECCION_VEHICULAR_FIELDS.KIT_08_OBS },
-  9: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_09_CINTA_PELIGRO, obs: INSPECCION_VEHICULAR_FIELDS.KIT_09_OBS },
-  10: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_10_MARTILLO_GOMA, obs: INSPECCION_VEHICULAR_FIELDS.KIT_10_OBS },
-  11: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_11_RECOGEDOR, obs: INSPECCION_VEHICULAR_FIELDS.KIT_11_OBS },
-  12: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_12_RESPIRADOR, obs: INSPECCION_VEHICULAR_FIELDS.KIT_12_OBS },
-  13: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_13_LINTERNA, obs: INSPECCION_VEHICULAR_FIELDS.KIT_13_OBS },
-  14: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_14_GRANULADO, obs: INSPECCION_VEHICULAR_FIELDS.KIT_14_OBS },
-  15: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_15_MASILLA, obs: INSPECCION_VEHICULAR_FIELDS.KIT_15_OBS },
-  16: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_16_DESENGRASANTE, obs: INSPECCION_VEHICULAR_FIELDS.KIT_16_OBS },
-  17: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_17_CHALECO, obs: INSPECCION_VEHICULAR_FIELDS.KIT_17_OBS },
-  18: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_18_CONOS, obs: INSPECCION_VEHICULAR_FIELDS.KIT_18_OBS },
-  19: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_19_PROCEDIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.KIT_19_OBS },
-  20: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_20_ALMACENAMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.KIT_20_OBS },
-  21: { estado: INSPECCION_VEHICULAR_FIELDS.KIT_21_ROTULADO, obs: INSPECCION_VEHICULAR_FIELDS.KIT_21_OBS },
-};
-
-// Mapeo de IDs de Botiquín a campos en Airtable
-const BOTIQUIN_FIELD_MAP: Record<number, { estado: string; cantidad: string; vencimiento?: string; obs: string }> = {
-  22: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_22_GASAS, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_22_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_22_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_22_OBS },
-  23: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_23_ESPARADRAPO, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_23_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_23_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_23_OBS },
-  24: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_24_BAJALENGUAS, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_24_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_24_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_24_OBS },
-  25: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_25_GUANTES_LATEX, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_25_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_25_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_25_OBS },
-  26: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_26_APLICADORES, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_26_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_26_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_26_OBS },
-  27: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_27_VENDA_2X5, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_27_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_27_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_27_OBS },
-  28: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_28_VENDA_3X5, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_28_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_28_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_28_OBS },
-  29: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_29_VENDA_5X5, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_29_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_29_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_29_OBS },
-  30: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_30_VENDA_ALG_3X5, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_30_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_30_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_30_OBS },
-  31: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_31_VENDA_ALG_5X5, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_31_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_31_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_31_OBS },
-  32: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_32_YODOPOVIDONA, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_32_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_32_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_32_OBS },
-  33: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_33_SOLUCION_SALINA, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_33_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_33_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_33_OBS },
-  34: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_34_TAPABOCAS, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_34_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_34_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_34_OBS },
-  35: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_35_ALCOHOL, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_35_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_35_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_35_OBS },
-  36: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_36_CURAS, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_36_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_36_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_36_OBS },
-  37: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_37_JERINGA, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_37_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_37_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_37_OBS },
-  38: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_38_TIJERAS, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_38_CANTIDAD, obs: INSPECCION_VEHICULAR_FIELDS.BOT_38_OBS },
-  39: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_39_PARCHE_OCULAR, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_39_CANTIDAD, vencimiento: INSPECCION_VEHICULAR_FIELDS.BOT_39_VENCIMIENTO, obs: INSPECCION_VEHICULAR_FIELDS.BOT_39_OBS },
-  40: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_40_TERMOMETRO, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_40_CANTIDAD, obs: INSPECCION_VEHICULAR_FIELDS.BOT_40_OBS },
-  41: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_41_LIBRETA, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_41_CANTIDAD, obs: INSPECCION_VEHICULAR_FIELDS.BOT_41_OBS },
-  42: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_42_LAPICERO, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_42_CANTIDAD, obs: INSPECCION_VEHICULAR_FIELDS.BOT_42_OBS },
-  43: { estado: INSPECCION_VEHICULAR_FIELDS.BOT_43_MANUAL, cantidad: INSPECCION_VEHICULAR_FIELDS.BOT_43_CANTIDAD, obs: INSPECCION_VEHICULAR_FIELDS.BOT_43_OBS },
-};
-
-// Mapeo de IDs de Extintor a campos en Airtable
-const EXTINTOR_FIELD_MAP: Record<number, { estado: string; obs: string }> = {
-  44: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_44_PRESION, obs: INSPECCION_VEHICULAR_FIELDS.EXT_44_OBS },
-  45: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_45_SELLO, obs: INSPECCION_VEHICULAR_FIELDS.EXT_45_OBS },
-  46: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_46_MANOMETRO, obs: INSPECCION_VEHICULAR_FIELDS.EXT_46_OBS },
-  47: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_47_CILINDRO, obs: INSPECCION_VEHICULAR_FIELDS.EXT_47_OBS },
-  48: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_48_MANIJA, obs: INSPECCION_VEHICULAR_FIELDS.EXT_48_OBS },
-  49: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_49_BOQUILLA, obs: INSPECCION_VEHICULAR_FIELDS.EXT_49_OBS },
-  50: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_50_ANILLO, obs: INSPECCION_VEHICULAR_FIELDS.EXT_50_OBS },
-  51: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_51_PIN, obs: INSPECCION_VEHICULAR_FIELDS.EXT_51_OBS },
-  52: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_52_PINTURA, obs: INSPECCION_VEHICULAR_FIELDS.EXT_52_OBS },
-  53: { estado: INSPECCION_VEHICULAR_FIELDS.EXT_53_TARJETA, obs: INSPECCION_VEHICULAR_FIELDS.EXT_53_OBS },
-};
+/** Crea registros en lotes de 10 (límite de la API de Airtable) */
+async function airtableBatchPost(
+  baseId: string,
+  tableId: string,
+  apiKey: string,
+  records: Array<Record<string, unknown>>
+): Promise<void> {
+  const BATCH = 10;
+  for (let i = 0; i < records.length; i += BATCH) {
+    const chunk = records.slice(i, i + BATCH).map((f) => ({ fields: f }));
+    const url = `https://api.airtable.com/v0/${baseId}/${tableId}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: chunk, typecast: true }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Airtable batch ${res.status}: ${err?.error?.message || JSON.stringify(err)}`);
+    }
+  }
+}
 
 // ===========================================
-// POST - Crear nueva inspección vehicular
+// POST — Crear inspección vehicular normalizada (4NF)
+// Flujo:
+//   1. INSERT encabezado → tabla principal  → devuelve recordId
+//   2. INSERT 44 filas  → Items Preoperacional  (linked a recordId)
+//   3. INSERT 21 filas  → Items Kit Derrame      (linked a recordId)
+//   4. INSERT 22 filas  → Items Botiquín         (linked a recordId)
+//   5. INSERT 10 filas  → Items Extintor         (linked a recordId)
 // ===========================================
 
 export async function POST(request: NextRequest) {
@@ -149,261 +192,207 @@ export async function POST(request: NextRequest) {
     const config = getInspeccionVehicularConfig();
 
     if (!config.API_KEY || !config.BASE_ID) {
-      return NextResponse.json(
-        { error: 'Configuración de Airtable no encontrada' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Configuración de Airtable no encontrada' }, { status: 500 });
     }
 
-    // Detectar tipo de inspección
-    const isKitInspection = body.kitDerrame || body.botiquin || body.extintor;
+    const { conductor, vehiculo, remolque, documentos, condiciones, firma, observacionesGenerales,
+            itemsVerificacion, kitDerrame, botiquin, extintor } = body;
 
-    // Extraer datos comunes del body
-    const {
-      conductor,
-      vehiculo,
-      firma,
-      observacionesGenerales
-    } = body;
+    // ── Calcular agregados ────────────────────────────────────────────────────
 
-    // Calcular totales
-    let totalBueno = 0;
-    let totalRegular = 0;
-    let totalMalo = 0;
-    let totalNoTiene = 0;
-    
-    // Preparar campos de inspección
-    const fields: Record<string, unknown> = {
-      // Metadatos del formato
-      [INSPECCION_VEHICULAR_FIELDS.FECHA_INSPECCION]: new Date().toISOString().split('T')[0],
-      [INSPECCION_VEHICULAR_FIELDS.CODIGO_FORMATO]: isKitInspection ? 'HSEQ-FOR-066' : 'HSEQ-FOR-065',
-      [INSPECCION_VEHICULAR_FIELDS.VERSION_FORMATO]: '001',
-      
-      // Conductor
-      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_CEDULA]: conductor?.cedula || '',
-      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_NOMBRE]: conductor?.nombre || '',
-      
-      // Vehículo
-      [INSPECCION_VEHICULAR_FIELDS.VEHICULO_PLACA]: vehiculo?.placa || '',
-      [INSPECCION_VEHICULAR_FIELDS.VEHICULO_MARCA]: vehiculo?.marca || '',
-      [INSPECCION_VEHICULAR_FIELDS.VEHICULO_LINEA]: vehiculo?.linea || '',
+    let totalCumple = 0, totalNoCumple = 0;
+    let totalBueno = 0, totalRegular = 0, totalMalo = 0, totalNoTiene = 0;
+
+    if (itemsVerificacion) {
+      for (const d of Object.values(itemsVerificacion) as Array<{ cumple?: boolean | null }>) {
+        if (d.cumple === true) totalCumple++;
+        else if (d.cumple === false) totalNoCumple++;
+      }
+    }
+    const contarEstado = (map: Record<string, { estado?: string | null }>) => {
+      for (const { estado } of Object.values(map)) {
+        if (estado === 'B') totalBueno++;
+        else if (estado === 'R') totalRegular++;
+        else if (estado === 'M') totalMalo++;
+        else if (estado === 'NT') totalNoTiene++;
+      }
+    };
+    if (kitDerrame)      contarEstado(kitDerrame);
+    if (botiquin)        contarEstado(botiquin);
+    if (extintor?.items) contarEstado(extintor.items);
+
+    const totalPreop = totalCumple + totalNoCumple;
+    const porcentaje = totalPreop > 0 ? ((totalCumple / totalPreop) * 100).toFixed(1) : '0';
+
+    // ── 1. ENCABEZADO ─────────────────────────────────────────────────────────
+
+    const headerFields: Record<string, unknown> = {
+      [INSPECCION_VEHICULAR_FIELDS.FECHA_INSPECCION]:   new Date().toISOString().split('T')[0],
+      [INSPECCION_VEHICULAR_FIELDS.CODIGO_FORMATO]:     'HSEQ-FOR-065',
+      [INSPECCION_VEHICULAR_FIELDS.VERSION_FORMATO]:    '001',
+
+      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_ID]:            conductor?.id || '',
+      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_CEDULA]:        conductor?.cedula || '',
+      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_NOMBRE]:        conductor?.nombre || '',
+      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_EDAD]:          conductor?.edad?.toString() || '',
+      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_EPS]:           conductor?.eps || '',
+      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_ARL]:           conductor?.arl || '',
+      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_FONDO_PENSION]: conductor?.fondoPension || '',
+      [INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_RH]:            conductor?.rh || '',
+
+      [INSPECCION_VEHICULAR_FIELDS.VEHICULO_PLACA]:  vehiculo?.placa || '',
+      [INSPECCION_VEHICULAR_FIELDS.VEHICULO_MARCA]:  vehiculo?.marca || '',
+      [INSPECCION_VEHICULAR_FIELDS.VEHICULO_LINEA]:  vehiculo?.linea || '',
       [INSPECCION_VEHICULAR_FIELDS.VEHICULO_MODELO]: vehiculo?.modelo || '',
-      
-      // Estado
-      [INSPECCION_VEHICULAR_FIELDS.ESTADO_INSPECCION]: 'Pendiente',
+
+      [INSPECCION_VEHICULAR_FIELDS.REMOLQUE_PLACA]:  remolque?.placa || '',
+      [INSPECCION_VEHICULAR_FIELDS.REMOLQUE_MARCA]:  remolque?.marca || '',
+      [INSPECCION_VEHICULAR_FIELDS.REMOLQUE_CLASE]:  remolque?.clase || '',
+      [INSPECCION_VEHICULAR_FIELDS.REMOLQUE_MODELO]: remolque?.modelo || '',
+
+      [INSPECCION_VEHICULAR_FIELDS.SOAT_CUMPLE]:        documentos?.soat?.cumple === true  ? 'Sí' : documentos?.soat?.cumple === false  ? 'No' : '',
+      [INSPECCION_VEHICULAR_FIELDS.SOAT_VENCIMIENTO]:   documentos?.soat?.vencimiento || '',
+      [INSPECCION_VEHICULAR_FIELDS.RTM_CUMPLE]:         documentos?.rtm?.cumple === true   ? 'Sí' : documentos?.rtm?.cumple === false   ? 'No' : '',
+      [INSPECCION_VEHICULAR_FIELDS.RTM_VENCIMIENTO]:    documentos?.rtm?.vencimiento || '',
+      [INSPECCION_VEHICULAR_FIELDS.POLIZA_CUMPLE]:      documentos?.poliza?.cumple === true ? 'Sí' : documentos?.poliza?.cumple === false ? 'No' : '',
+      [INSPECCION_VEHICULAR_FIELDS.POLIZA_VENCIMIENTO]: documentos?.poliza?.vencimiento || '',
+      [INSPECCION_VEHICULAR_FIELDS.LICENCIA_CUMPLE]:    documentos?.licencia?.cumple === true ? 'Sí' : documentos?.licencia?.cumple === false ? 'No' : '',
+      [INSPECCION_VEHICULAR_FIELDS.CATEGORIAS_LICENCIA]:Array.isArray(documentos?.licencia?.categorias) ? documentos.licencia.categorias.join(', ') : '',
+      [INSPECCION_VEHICULAR_FIELDS.VIGENCIAS_LICENCIA]: JSON.stringify(documentos?.licencia?.vigencias || {}),
+
+      [INSPECCION_VEHICULAR_FIELDS.HORAS_DORMIR]:        condiciones?.horasDormir?.toString() || '',
+      [INSPECCION_VEHICULAR_FIELDS.KILOMETRAJE_INICIAL]: condiciones?.kilometrajeInicial?.toString() || '',
+
+      // Agregados calculados (evita re-calcular en consultas)
+      [INSPECCION_VEHICULAR_FIELDS.TOTAL_ITEMS_CUMPLE]:    totalCumple.toString(),
+      [INSPECCION_VEHICULAR_FIELDS.TOTAL_ITEMS_NO_CUMPLE]: totalNoCumple.toString(),
+      [INSPECCION_VEHICULAR_FIELDS.PORCENTAJE_CUMPLIMIENTO]:`${porcentaje}%`,
+      [INSPECCION_VEHICULAR_FIELDS.TOTAL_BUENO]:    totalBueno,
+      [INSPECCION_VEHICULAR_FIELDS.TOTAL_REGULAR]:  totalRegular,
+      [INSPECCION_VEHICULAR_FIELDS.TOTAL_MALO]:     totalMalo,
+      [INSPECCION_VEHICULAR_FIELDS.TOTAL_NO_TIENE]: totalNoTiene,
+
+      ...(extintor?.fechaActual?.dia && {
+        [INSPECCION_VEHICULAR_FIELDS.EXT_FECHA_ACTUAL]: `${extintor.fechaActual.dia}/${extintor.fechaActual.mes}/${extintor.fechaActual.ano}`,
+      }),
+      ...(extintor?.fechaProximaRecarga?.dia && {
+        [INSPECCION_VEHICULAR_FIELDS.EXT_FECHA_PROXIMA_RECARGA]: `${extintor.fechaProximaRecarga.dia}/${extintor.fechaProximaRecarga.mes}/${extintor.fechaProximaRecarga.ano}`,
+      }),
+
+      [INSPECCION_VEHICULAR_FIELDS.FIRMA_CONDUCTOR]:         firma || '',
+      [INSPECCION_VEHICULAR_FIELDS.ESTADO_INSPECCION]:       'Pendiente',
       [INSPECCION_VEHICULAR_FIELDS.OBSERVACIONES_GENERALES]: observacionesGenerales || '',
-      
-      // Firma (base64 o URL)
-      [INSPECCION_VEHICULAR_FIELDS.FIRMA_CONDUCTOR]: firma || '',
     };
 
-    // Si es inspección de Kit de Derrame, Botiquín y Extintor
-    if (isKitInspection) {
-      const { kitDerrame, botiquin, extintor } = body;
-
-      // Procesar Kit de Derrame
-      if (kitDerrame && typeof kitDerrame === 'object') {
-        Object.entries(kitDerrame).forEach(([itemId, data]) => {
-          const id = parseInt(itemId);
-          const itemData = data as { estado?: string | null; observacion?: string };
-          const fieldMap = KIT_DERRAME_FIELD_MAP[id];
-          
-          if (fieldMap && itemData.estado) {
-            fields[fieldMap.estado] = itemData.estado;
-            if (itemData.observacion) {
-              fields[fieldMap.obs] = itemData.observacion;
-            }
-            // Contar estados
-            if (itemData.estado === 'B') totalBueno++;
-            else if (itemData.estado === 'R') totalRegular++;
-            else if (itemData.estado === 'M') totalMalo++;
-            else if (itemData.estado === 'NT') totalNoTiene++;
-          }
-        });
-      }
-
-      // Procesar Botiquín
-      if (botiquin && typeof botiquin === 'object') {
-        Object.entries(botiquin).forEach(([itemId, data]) => {
-          const id = parseInt(itemId);
-          const itemData = data as { estado?: string | null; cantidad?: string; fechaVencimiento?: string; observacion?: string };
-          const fieldMap = BOTIQUIN_FIELD_MAP[id];
-          
-          if (fieldMap) {
-            if (itemData.estado) {
-              fields[fieldMap.estado] = itemData.estado;
-              // Contar estados
-              if (itemData.estado === 'B') totalBueno++;
-              else if (itemData.estado === 'R') totalRegular++;
-              else if (itemData.estado === 'M') totalMalo++;
-              else if (itemData.estado === 'NT') totalNoTiene++;
-            }
-            if (itemData.cantidad) {
-              fields[fieldMap.cantidad] = itemData.cantidad;
-            }
-            if (itemData.fechaVencimiento && fieldMap.vencimiento) {
-              fields[fieldMap.vencimiento] = itemData.fechaVencimiento;
-            }
-            if (itemData.observacion) {
-              fields[fieldMap.obs] = itemData.observacion;
-            }
-          }
-        });
-      }
-
-      // Procesar Extintor
-      if (extintor && typeof extintor === 'object') {
-        const { items, fechaActual, fechaProximaRecarga } = extintor as {
-          items?: Record<string, { estado?: string | null; observacion?: string }>;
-          fechaActual?: { dia?: string; mes?: string; ano?: string };
-          fechaProximaRecarga?: { dia?: string; mes?: string; ano?: string };
-        };
-
-        // Procesar items del extintor
-        if (items && typeof items === 'object') {
-          Object.entries(items).forEach(([itemId, data]) => {
-            const id = parseInt(itemId);
-            const itemData = data as { estado?: string | null; observacion?: string };
-            const fieldMap = EXTINTOR_FIELD_MAP[id];
-            
-            if (fieldMap && itemData.estado) {
-              fields[fieldMap.estado] = itemData.estado;
-              if (itemData.observacion) {
-                fields[fieldMap.obs] = itemData.observacion;
-              }
-              // Contar estados
-              if (itemData.estado === 'B') totalBueno++;
-              else if (itemData.estado === 'R') totalRegular++;
-              else if (itemData.estado === 'M') totalMalo++;
-            }
-          });
-        }
-
-        // Procesar fechas del extintor
-        if (fechaActual && (fechaActual.dia || fechaActual.mes || fechaActual.ano)) {
-          const fechaStr = `${fechaActual.dia || ''}/${fechaActual.mes || ''}/${fechaActual.ano || ''}`;
-          fields[INSPECCION_VEHICULAR_FIELDS.EXT_FECHA_ACTUAL] = fechaStr;
-        }
-
-        if (fechaProximaRecarga && (fechaProximaRecarga.dia || fechaProximaRecarga.mes || fechaProximaRecarga.ano)) {
-          const fechaStr = `${fechaProximaRecarga.dia || ''}/${fechaProximaRecarga.mes || ''}/${fechaProximaRecarga.ano || ''}`;
-          fields[INSPECCION_VEHICULAR_FIELDS.EXT_FECHA_PROXIMA_RECARGA] = fechaStr;
-        }
-      }
-
-    } else {
-      // Inspección preoperacional tradicional
-      const { remolque, documentos, condiciones, itemsVerificacion } = body;
-      
-      // Campos adicionales del conductor
-      fields[INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_EDAD] = conductor?.edad?.toString() || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_EPS] = conductor?.eps || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_ARL] = conductor?.arl || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_FONDO_PENSION] = conductor?.fondoPension || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_RH] = conductor?.rh || '';
-      
-      // Remolque
-      fields[INSPECCION_VEHICULAR_FIELDS.REMOLQUE_PLACA] = remolque?.placa || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.REMOLQUE_MARCA] = remolque?.marca || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.REMOLQUE_CLASE] = remolque?.clase || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.REMOLQUE_MODELO] = remolque?.modelo || '';
-      
-      // Documentos
-      fields[INSPECCION_VEHICULAR_FIELDS.SOAT_CUMPLE] = documentos?.soat?.cumple ? 'Sí' : 'No';
-      fields[INSPECCION_VEHICULAR_FIELDS.SOAT_VENCIMIENTO] = documentos?.soat?.vencimiento || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.RTM_CUMPLE] = documentos?.rtm?.cumple ? 'Sí' : 'No';
-      fields[INSPECCION_VEHICULAR_FIELDS.RTM_VENCIMIENTO] = documentos?.rtm?.vencimiento || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.POLIZA_CUMPLE] = documentos?.poliza?.cumple ? 'Sí' : 'No';
-      fields[INSPECCION_VEHICULAR_FIELDS.POLIZA_VENCIMIENTO] = documentos?.poliza?.vencimiento || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.LICENCIA_CUMPLE] = documentos?.licencia?.cumple ? 'Sí' : 'No';
-      fields[INSPECCION_VEHICULAR_FIELDS.CATEGORIAS_LICENCIA] = documentos?.licencia?.categorias?.join(', ') || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.VIGENCIAS_LICENCIA] = JSON.stringify(documentos?.licencia?.vigencias || {});
-      
-      // Condiciones operativas
-      fields[INSPECCION_VEHICULAR_FIELDS.HORAS_DORMIR] = condiciones?.horasDormir?.toString() || '';
-      fields[INSPECCION_VEHICULAR_FIELDS.KILOMETRAJE_INICIAL] = condiciones?.kilometrajeInicial?.toString() || '';
-
-      // Procesar items de verificación preoperacional
-      if (itemsVerificacion && typeof itemsVerificacion === 'object') {
-        let totalCumple = 0;
-        let totalNoCumple = 0;
-        
-        Object.entries(itemsVerificacion).forEach(([itemId, data]) => {
-          const id = parseInt(itemId);
-          const itemData = data as { cumple?: boolean | null; observacion?: string };
-          const fieldMap = ITEM_FIELD_MAP[id];
-          
-          if (fieldMap) {
-            let cumpleValue: string;
-            if (itemData.cumple === true) {
-              cumpleValue = 'Cumple';
-              totalCumple++;
-            } else if (itemData.cumple === false) {
-              cumpleValue = 'No Cumple';
-              totalNoCumple++;
-            } else {
-              cumpleValue = 'N/A';
-            }
-            
-            fields[fieldMap.cumple] = cumpleValue;
-            fields[fieldMap.obs] = itemData.observacion || '';
-          }
-        });
-
-        // Agregar totales y porcentaje
-        const totalItems = totalCumple + totalNoCumple;
-        const porcentaje = totalItems > 0 ? ((totalCumple / totalItems) * 100).toFixed(2) : '0';
-        
-        fields[INSPECCION_VEHICULAR_FIELDS.TOTAL_ITEMS_CUMPLE] = totalCumple.toString();
-        fields[INSPECCION_VEHICULAR_FIELDS.TOTAL_ITEMS_NO_CUMPLE] = totalNoCumple.toString();
-        fields[INSPECCION_VEHICULAR_FIELDS.PORCENTAJE_CUMPLIMIENTO] = `${porcentaje}%`;
-      }
+    // Limpiar vacíos
+    for (const k of Object.keys(headerFields)) {
+      if (headerFields[k] === '' || headerFields[k] == null) delete headerFields[k];
     }
 
-    // Limpiar campos vacíos para evitar errores en Airtable
-    Object.keys(fields).forEach(key => {
-      if (fields[key] === '' || fields[key] === undefined || fields[key] === null) {
-        delete fields[key];
-      }
-    });
+    const headerRecord = await airtablePost(config.BASE_ID, config.TABLE_ID, config.API_KEY, headerFields);
+    const inspeccionLink = [headerRecord.id]; // linked record field espera array de IDs
 
-    console.log('Creating inspection record with fields:', Object.keys(fields).length);
-    
-    // Crear registro en Airtable
-    const result = await createAirtableRecord(
-      config.BASE_ID,
-      config.TABLE_NAME,
-      config.API_KEY,
-      fields
+    // ── 2. ÍTEMS PREOPERACIONAL ───────────────────────────────────────────────
+
+    if (itemsVerificacion && typeof itemsVerificacion === 'object') {
+      const rows = CATALOGO_PREOP.map((cat) => {
+        const d = (itemsVerificacion as Record<number, { cumple?: boolean | null; observacion?: string }>)[cat.id];
+        const cumpleVal = d?.cumple === true ? 'Cumple' : d?.cumple === false ? 'No Cumple' : 'N/A';
+        const row: Record<string, unknown> = {
+          [ITEMS_PREOP_FIELDS.INSPECCION]:  inspeccionLink,
+          [ITEMS_PREOP_FIELDS.ITEM_NUMERO]: cat.id,
+          [ITEMS_PREOP_FIELDS.ITEM_NOMBRE]: cat.nombre,
+          [ITEMS_PREOP_FIELDS.CATEGORIA]:   cat.categoria,
+          [ITEMS_PREOP_FIELDS.CUMPLE]:      cumpleVal,
+        };
+        if (d?.observacion) row[ITEMS_PREOP_FIELDS.OBSERVACION] = d.observacion;
+        return row;
+      });
+      await airtableBatchPost(config.BASE_ID, config.TABLE_ITEMS_PREOP, config.API_KEY, rows);
+    }
+
+    // ── 3. ÍTEMS KIT DE DERRAME ──────────────────────────────────────────────
+
+    if (kitDerrame && typeof kitDerrame === 'object') {
+      const rows = CATALOGO_KIT.map((cat) => {
+        const d = (kitDerrame as Record<number, { estado?: string | null; observacion?: string }>)[cat.id];
+        const row: Record<string, unknown> = {
+          [ITEMS_KIT_FIELDS.INSPECCION]:  inspeccionLink,
+          [ITEMS_KIT_FIELDS.ITEM_NUMERO]: cat.id,
+          [ITEMS_KIT_FIELDS.ITEM_NOMBRE]: cat.nombre,
+          [ITEMS_KIT_FIELDS.TIPO_ITEM]:   cat.tipo,
+          [ITEMS_KIT_FIELDS.ESTADO]:      d?.estado || 'NT',
+        };
+        if (d?.observacion) row[ITEMS_KIT_FIELDS.OBSERVACION] = d.observacion;
+        return row;
+      });
+      await airtableBatchPost(config.BASE_ID, config.TABLE_ITEMS_KIT, config.API_KEY, rows);
+    }
+
+    // ── 4. ÍTEMS BOTIQUÍN ────────────────────────────────────────────────────
+
+    if (botiquin && typeof botiquin === 'object') {
+      const rows = CATALOGO_BOTIQUIN.map((cat) => {
+        const d = (botiquin as Record<number, { estado?: string | null; cantidad?: string; fechaVencimiento?: string; observacion?: string }>)[cat.id];
+        const row: Record<string, unknown> = {
+          [ITEMS_BOTIQUIN_FIELDS.INSPECCION]:  inspeccionLink,
+          [ITEMS_BOTIQUIN_FIELDS.ITEM_NUMERO]: cat.id,
+          [ITEMS_BOTIQUIN_FIELDS.ITEM_NOMBRE]: cat.nombre,
+          [ITEMS_BOTIQUIN_FIELDS.ESTADO]:      d?.estado || 'NT',
+          [ITEMS_BOTIQUIN_FIELDS.CANTIDAD]:    d?.cantidad || cat.cantidadEstandar.toString(),
+        };
+        if (d?.fechaVencimiento && cat.tieneVencimiento) {
+          row[ITEMS_BOTIQUIN_FIELDS.FECHA_VENCIMIENTO] = d.fechaVencimiento;
+        }
+        if (d?.observacion) row[ITEMS_BOTIQUIN_FIELDS.OBSERVACION] = d.observacion;
+        return row;
+      });
+      await airtableBatchPost(config.BASE_ID, config.TABLE_ITEMS_BOTIQUIN, config.API_KEY, rows);
+    }
+
+    // ── 5. ÍTEMS EXTINTOR ────────────────────────────────────────────────────
+
+    if (extintor?.items && typeof extintor.items === 'object') {
+      const rows = CATALOGO_EXTINTOR.map((cat) => {
+        const d = (extintor.items as Record<number, { estado?: string | null; observacion?: string }>)[cat.id];
+        const row: Record<string, unknown> = {
+          [ITEMS_EXTINTOR_FIELDS.INSPECCION]:  inspeccionLink,
+          [ITEMS_EXTINTOR_FIELDS.ITEM_NUMERO]: cat.id,
+          [ITEMS_EXTINTOR_FIELDS.ITEM_NOMBRE]: cat.nombre,
+          [ITEMS_EXTINTOR_FIELDS.ESTADO]:      d?.estado || 'NT',
+        };
+        if (d?.observacion) row[ITEMS_EXTINTOR_FIELDS.OBSERVACION] = d.observacion;
+        return row;
+      });
+      await airtableBatchPost(config.BASE_ID, config.TABLE_ITEMS_EXTINTOR, config.API_KEY, rows);
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Inspección vehicular registrada correctamente',
+        data: {
+          recordId: headerRecord.id,
+          codigoInspeccion: headerRecord.fields?.['Codigo Inspeccion'] || headerRecord.id,
+          totales: {
+            preoperacional: { cumple: totalCumple, noCumple: totalNoCumple, porcentaje: `${porcentaje}%` },
+            estadoItems:    { bueno: totalBueno, regular: totalRegular, malo: totalMalo, noTiene: totalNoTiene },
+          },
+        },
+      },
+      { status: 201 }
     );
-
-    return NextResponse.json({
-      success: true,
-      message: 'Inspección vehicular registrada correctamente',
-      data: {
-        recordId: result.id,
-        codigoInspeccion: result.fields?.['Codigo Inspeccion'] || result.id,
-        totalBueno,
-        totalRegular,
-        totalMalo,
-        totalNoTiene,
-      }
-    }, { status: 201 });
-
   } catch (error) {
     console.error('Error creando inspección vehicular:', error);
     return NextResponse.json(
-      { 
-        error: 'Error al registrar la inspección',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Error al registrar la inspección', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
 }
 
 // ===========================================
-// GET - Obtener inspecciones (opcional, para consultas)
+// GET - Obtener inspecciones
 // ===========================================
 
 export async function GET(request: NextRequest) {
@@ -420,31 +409,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Sanitize inputs: only allow alphanumeric chars (prevents formula injection)
+    const safeCedula = cedula ? cedula.replace(/[^a-zA-Z0-9]/g, '') : null;
+    const safePlaca  = placa  ? placa.replace(/[^a-zA-Z0-9]/g, '') : null;
+
     let filterFormula = '';
-    if (cedula) {
-      filterFormula = `{${INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_CEDULA}} = '${cedula}'`;
-    } else if (placa) {
-      filterFormula = `{${INSPECCION_VEHICULAR_FIELDS.VEHICULO_PLACA}} = '${placa}'`;
+    if (safeCedula) {
+      filterFormula = `{${INSPECCION_VEHICULAR_FIELDS.CONDUCTOR_CEDULA}} = '${safeCedula}'`;
+    } else if (safePlaca) {
+      filterFormula = `{${INSPECCION_VEHICULAR_FIELDS.VEHICULO_PLACA}} = '${safePlaca}'`;
     }
 
-    const params: Record<string, string> = {
-      maxRecords: '100',
-    };
-    
-    if (filterFormula) {
-      params.filterByFormula = filterFormula;
-    }
+    const params: Record<string, string> = { maxRecords: '100' };
+    if (filterFormula) params.filterByFormula = filterFormula;
 
     const queryString = new URLSearchParams(params).toString();
-    const url = `https://api.airtable.com/v0/${config.BASE_ID}/${encodeURIComponent(config.TABLE_NAME)}?${queryString}`;
-
-    console.log('Fetching vehicular inspections from:', url);
+    const url = `https://api.airtable.com/v0/${config.BASE_ID}/${config.TABLE_ID}?${queryString}`;
 
     const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${config.API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${config.API_KEY}` },
     });
 
     if (!response.ok) {
@@ -454,13 +437,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    
-    console.log(`Found ${data.records?.length || 0} vehicular inspections`);
-    
-    return NextResponse.json({
-      success: true,
-      records: data.records || [],
-    });
+    return NextResponse.json({ success: true, records: data.records || [] });
 
   } catch (error) {
     console.error('Error obteniendo inspecciones:', error);
