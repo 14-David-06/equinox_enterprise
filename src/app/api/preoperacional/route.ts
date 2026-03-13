@@ -3,6 +3,8 @@ import { getInspeccionesConfig, getConductoresConfig, TABLES, INSPECCION_PREOP_F
 import { generatePreoperacionalPDF } from '@/lib/pdf-generator';
 import { uploadPDFToCloudinary } from '@/lib/cloudinary';
 import { encrypt } from '@/lib/encryption';
+import { verifyToken } from '@/lib/jwt';
+import cookie from 'cookie';
 
 // ===========================================
 // FUNCIONES AUXILIARES PARA AIRTABLE
@@ -75,7 +77,9 @@ async function upsertConductor(conductorData: any) {
   const config = getConductoresConfig();
   
   // Buscar conductor por cédula
-  const filterFormula = `{${CONDUCTOR_FIELDS.CEDULA}} = '${conductorData.cedula}'`;
+  // Sanitize: cedula must be digits only
+  const safeCedula = String(conductorData.cedula).replace(/[^0-9]/g, '');
+  const filterFormula = `{${CONDUCTOR_FIELDS.CEDULA}} = '${safeCedula}'`;
   const searchUrl = `https://api.airtable.com/v0/${config.BASE_ID}/${TABLES.CONDUCTORES.NAME}?filterByFormula=${encodeURIComponent(filterFormula)}`;
   
   const searchResponse = await fetch(searchUrl, {
@@ -152,6 +156,14 @@ async function upsertConductor(conductorData: any) {
 // ===========================================
 
 export async function POST(request: NextRequest) {
+  // Authentication required – form is behind /preoperacional/formato (protected)
+  const headerCookie = request.headers.get('cookie') || '';
+  const parsedCookie = cookie.parse(headerCookie);
+  const authUser = parsedCookie.token ? verifyToken(parsedCookie.token) : null;
+  if (!authUser) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     

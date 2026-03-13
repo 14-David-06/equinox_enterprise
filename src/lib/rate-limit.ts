@@ -94,21 +94,27 @@ export const rateLimiter = new RateLimiter();
 
 /**
  * Obtiene el identificador de la request (IP)
+ * Note: x-forwarded-for can be spoofed when not behind a trusted proxy.
+ * Use Cloudflare's cf-connecting-ip or similar trusted header in production.
  */
 export function getClientIdentifier(request: Request): string {
-  // Intenta obtener IP real de headers comunes (detrás de proxies)
+  // Prefer Cloudflare's trusted header in production
+  const cfIp = request.headers.get('cf-connecting-ip');
+  if (cfIp) return cfIp.trim();
+
+  // x-real-ip (typically set by nginx, more reliable than x-forwarded-for)
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
+
+  // x-forwarded-for — take only the rightmost IP (last hop, hardest to spoof)
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) {
-    return forwarded.split(',')[0].trim();
+    const ips = forwarded.split(',').map((s) => s.trim()).filter(Boolean);
+    if (ips.length > 0) return ips[ips.length - 1];
   }
 
-  const realIp = request.headers.get('x-real-ip');
-  if (realIp) {
-    return realIp;
-  }
-
-  // Fallback
-  return 'unknown';
+  // Fallback: shared bucket for unidentified clients
+  return 'global';
 }
 
 /**

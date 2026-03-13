@@ -39,8 +39,9 @@ export async function POST(request: NextRequest) {
     }
 
     const config = getConductoresConfig();
-    
+
     // 1. Buscar conductor por cédula
+    // cedulaLimpia already contains only digits (replace(/\D/g,'')) — safe for formula
     const filterCedula = `{${CONDUCTOR_FIELDS.CEDULA}} = '${cedulaLimpia}'`;
     const urlCedula = `${config.BASE_URL}/${config.BASE_ID}/${TABLES.CONDUCTORES.NAME}?filterByFormula=${encodeURIComponent(filterCedula)}&maxRecords=1&fields%5B%5D=${encodeURIComponent(CONDUCTOR_FIELDS.CEDULA)}&fields%5B%5D=${encodeURIComponent(CONDUCTOR_FIELDS.EMAIL)}`;
 
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
     let emailMessage = '';
 
     if (email && typeof email === 'string' && email.includes('@')) {
-      const emailLimpio = email.toLowerCase().trim();
+      // Sanitize: allowlist chars valid in email addresses, preventing Airtable formula injection
+      const emailLimpio = email.toLowerCase().trim().replace(/[^a-zA-Z0-9@._\-+]/g, '');
       const filterEmail = `AND({${CONDUCTOR_FIELDS.EMAIL}} = '${emailLimpio}', {${CONDUCTOR_FIELDS.CEDULA}} != '${cedulaLimpia}')`;
       const urlEmail = `${config.BASE_URL}/${config.BASE_ID}/${TABLES.CONDUCTORES.NAME}?filterByFormula=${encodeURIComponent(filterEmail)}&maxRecords=1&fields%5B%5D=${encodeURIComponent(CONDUCTOR_FIELDS.EMAIL)}`;
 

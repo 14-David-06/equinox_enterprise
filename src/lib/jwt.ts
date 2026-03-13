@@ -22,8 +22,8 @@ function getAuthSecret(): string {
     throw new Error('AUTH_SECRET is required');
   }
   
-  if (process.env.NODE_ENV === 'production' && secret.length < 32) {
-    throw new Error('AUTH_SECRET must be at least 32 characters in production');
+  if (process.env.NODE_ENV === 'production' && secret.length < 64) {
+    throw new Error('AUTH_SECRET must be at least 64 characters in production (256-bit minimum). Generate with: openssl rand -hex 32');
   }
   
   return secret;
@@ -31,13 +31,21 @@ function getAuthSecret(): string {
 
 const SECRET = getAuthSecret();
 
-export function signToken(payload: object, expiresIn = '7d') {
-  return jwt.sign(payload as any, SECRET as any, { expiresIn } as any);
+export function signToken(payload: object, expiresIn = '24h') {
+  return jwt.sign(
+    { ...payload as object, iss: 'equinox-enterprise', aud: 'equinox-users' } as any,
+    SECRET as any,
+    { expiresIn, algorithm: 'HS256' } as any
+  );
 }
 
 export function verifyToken(token: string) {
   try {
-    return jwt.verify(token, SECRET) as any;
+    return jwt.verify(token, SECRET, {
+      algorithms: ['HS256'],
+      issuer: 'equinox-enterprise',
+      audience: 'equinox-users',
+    }) as any;
   } catch (err) {
     return null;
   }

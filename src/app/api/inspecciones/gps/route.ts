@@ -92,8 +92,10 @@ export async function POST(request: NextRequest) {
       const conductorCedula = fields['Conductor Cedula'];
       
       if (conductorCedula) {
+        // Sanitize: conductor cedula is numeric-only
+        const safeCedula = String(conductorCedula).replace(/[^0-9]/g, '');
         const conductorConfig = getConductoresConfig();
-        const filterFormula = `{Cedula} = '${conductorCedula}'`;
+        const filterFormula = `{Cedula} = '${safeCedula}'`;
         const conductorUrl = `https://api.airtable.com/v0/${conductorConfig.BASE_ID}/${encodeURIComponent(TABLES.CONDUCTORES.NAME)}?filterByFormula=${encodeURIComponent(filterFormula)}&maxRecords=1`;
 
         const conductorResponse = await fetch(conductorUrl, {

@@ -80,8 +80,18 @@ async function downloadExistingPDF(docField: any): Promise<Uint8Array | null> {
     const pdfUrl = docField[0].url;
     if (!pdfUrl) return null;
 
-    console.log(`📥 Descargando PDF existente: ${pdfUrl}`);
-    const response = await fetch(pdfUrl);
+    // SSRF guard: only allow Airtable attachment URLs and Cloudinary
+    const ALLOWED_HOSTS = [
+      'https://dl.airtable.com/',
+      'https://v5.airtableusercontent.com/',
+      'https://res.cloudinary.com/',
+    ];
+    if (!ALLOWED_HOSTS.some((host) => pdfUrl.startsWith(host))) {
+      console.warn(`⚠️ PDF URL rejected (not in allowlist): ${pdfUrl}`);
+      return null;
+    }
+
+    const response = await fetch(pdfUrl, { signal: AbortSignal.timeout(10_000) });
     
     if (!response.ok) {
       console.warn(`⚠️ No se pudo descargar el PDF: ${response.status}`);

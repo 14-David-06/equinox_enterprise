@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { TABLES, USUARIO_FIELDS, getAirtableConfig } from '@/lib/airtable-config';
 
-// ⚠️ SEGURIDAD: Este endpoint solo está disponible en desarrollo
-const IS_DEV = process.env.NODE_ENV === 'development' && process.env.ENABLE_DEV_ENDPOINTS === 'true';
+// ⚠️  SEGURIDAD: Solo disponible en desarrollo local.
+// Devuelve 404 (no 403) para no revelar la existencia del endpoint en producción.
+const IS_DEV =
+  process.env.NODE_ENV !== 'production' &&
+  process.env.ENABLE_DEV_ENDPOINTS === 'true';
 
 // Función auxiliar para fetch a Airtable
 async function fetchAirtable(tableName: string, params?: Record<string, string>) {
@@ -32,8 +35,8 @@ export async function GET(request: Request) {
   // ⚠️ SEGURIDAD: Bloquear en producción
   if (!IS_DEV) {
     return NextResponse.json(
-      { error: 'Este endpoint solo está disponible en desarrollo' },
-      { status: 403 }
+      { error: 'Not found' },
+      { status: 404 }
     );
   }
 

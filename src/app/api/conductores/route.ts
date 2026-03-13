@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConductoresConfig, TABLES, CONDUCTOR_FIELDS } from '@/lib/airtable-config';
+import { verifyToken } from '@/lib/jwt';
+import cookie from 'cookie';
 
 // ===========================================
 // GET - Obtener lista de conductores
 // ===========================================
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Require authentication - this data contains PII
+  const headerCookie = request.headers.get('cookie') || '';
+  const parsed = cookie.parse(headerCookie);
+  const user = parsed.token ? verifyToken(parsed.token) : null;
+  if (!user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
   try {
     const config = getConductoresConfig();
 
@@ -62,7 +72,7 @@ export async function GET() {
   } catch (error) {
     console.error('Error obteniendo conductores:', error);
     return NextResponse.json(
-      { error: 'Error al obtener conductores', details: error instanceof Error ? error.message : 'Unknown' },
+      { error: 'Error al obtener conductores' },
       { status: 500 }
     );
   }
@@ -73,6 +83,17 @@ export async function GET() {
 // ===========================================
 
 export async function POST(request: NextRequest) {
+  // Require Admin role to create conductors
+  const headerCookie = request.headers.get('cookie') || '';
+  const parsedCookie = cookie.parse(headerCookie);
+  const userPost = parsedCookie.token ? verifyToken(parsedCookie.token) : null;
+  if (!userPost) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+  if (!['Admin', 'Administrador'].includes(userPost.rol)) {
+    return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+  }
+
   try {
     const config = getConductoresConfig();
 
@@ -94,8 +115,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Sanitize cedula: digits only to prevent formula injection
+    const safeCedula = cedula.replace(/[^0-9]/g, '');
+    if (!safeCedula) {
+      return NextResponse.json({ error: 'Cédula inválida' }, { status: 400 });
+    }
+
     // Verificar si ya existe un conductor con esa cédula
-    const checkUrl = `${config.BASE_URL}/${config.BASE_ID}/${TABLES.CONDUCTORES.NAME}?filterByFormula=${encodeURIComponent(`{${CONDUCTOR_FIELDS.CEDULA}} = '${cedula}'`)}&maxRecords=1`;
+    const checkUrl = `${config.BASE_URL}/${config.BASE_ID}/${TABLES.CONDUCTORES.NAME}?filterByFormula=${encodeURIComponent(`{${CONDUCTOR_FIELDS.CEDULA}} = '${safeCedula}'`)}&maxRecords=1`;
     const checkResponse = await fetch(checkUrl, {
       headers: {
         'Authorization': `Bearer ${config.API_KEY}`,
@@ -107,7 +134,7 @@ export async function POST(request: NextRequest) {
       const checkData = await checkResponse.json();
       if (checkData.records && checkData.records.length > 0) {
         return NextResponse.json(
-          { error: `Ya existe un conductor con cédula ${cedula}` },
+          { error: `Ya existe un conductor con cédula ${safeCedula}` },
           { status: 409 }
         );
       }
@@ -116,7 +143,7 @@ export async function POST(request: NextRequest) {
     // Crear el registro
     const fields: Record<string, string> = {
       [CONDUCTOR_FIELDS.NOMBRE_COMPLETO]: nombreCompleto,
-      [CONDUCTOR_FIELDS.CEDULA]: cedula,
+      [CONDUCTOR_FIELDS.CEDULA]: safeCedula,
       [CONDUCTOR_FIELDS.ESTADO]: 'Activo',
     };
 
@@ -171,7 +198,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creando conductor:', error);
     return NextResponse.json(
-      { error: 'Error al crear conductor', details: error instanceof Error ? error.message : 'Unknown' },
+      { error: 'Error al crear conductor' },
       { status: 500 }
     );
   }

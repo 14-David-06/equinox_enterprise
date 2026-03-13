@@ -101,16 +101,16 @@ export default function CertificationsCarousel() {
                         <div className="relative group">
                           <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-yellow-500/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                           <div className="relative bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
-                            <Image
-                              src={cert.image}
-                              alt={cert.name}
-                              width={cert.name === 'NORSOK S-006' ? 280 : 200}
-                              height={cert.name === 'NORSOK S-006' ? 200 : 150}
-                              className={`w-auto mx-auto object-contain filter brightness-100 contrast-110 ${
-                                cert.name === 'NORSOK S-006' ? 'h-50' : 'h-32'
-                              }`}
-                              priority={index === 0}
-                            />
+                            <div className="w-48 h-40 flex items-center justify-center mx-auto">
+                              <Image
+                                src={cert.image}
+                                alt={cert.name}
+                                width={192}
+                                height={160}
+                                className="w-full h-full object-contain filter brightness-100 contrast-110"
+                                priority={index === 0}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>

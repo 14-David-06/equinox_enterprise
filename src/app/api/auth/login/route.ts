@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     if (!usuario) {
       return NextResponse.json(
-        { error: 'Usuario no encontrado' },
+        { error: 'Credenciales inválidas' },
         { status: 401 }
       );
     }
@@ -72,26 +72,26 @@ export async function POST(request: NextRequest) {
       const isValidPassword = await bcrypt.compare(password, storedPassword);
       if (!isValidPassword) {
         return NextResponse.json(
-          { error: 'Contraseña incorrecta' },
+          { error: 'Credenciales inválidas' },
           { status: 401 }
         );
       }
     }
 
-    // Generar token JWT simple (7 días)
+    // Generar token JWT (24 horas)
     const token = signToken({ 
       id: usuario.id, 
       cedula: usuario.fields[USUARIO_FIELDS.NUMERO_DOCUMENTO], 
       nombre: usuario.fields[USUARIO_FIELDS.NOMBRE_COMPLETO], 
       rol: usuario.fields[USUARIO_FIELDS.ROL] 
-    }, '7d');
+    }, '24h');
 
     const tokenCookie = cookie.serialize('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24, // 24 hours
     });
 
     const responseBody = {
