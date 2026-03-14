@@ -614,86 +614,6 @@ export default function InspeccionVehicularPage() {
     setFirmaConductor('');
   };
 
-  // ==========================================
-  // PRE-LLENAR FORMULARIO PARA PRUEBAS
-  // ==========================================
-  const preLlenarFormulario = () => {
-    // Seleccionar primer conductor si existe
-    if (conductores.length > 0) {
-      const primerConductor = conductores[0];
-      setConductorSeleccionado(primerConductor);
-      if (primerConductor.categoriasLicencia) {
-        const cats = primerConductor.categoriasLicencia.split(',').map(c => c.trim());
-        setCategoriasSeleccionadas(cats.filter(c => CATEGORIAS_LICENCIA.includes(c)));
-        const vigsTest: Record<string, string> = {};
-        cats.forEach(c => { vigsTest[c] = '2027-06-15'; });
-        setVigenciasLicencia(vigsTest);
-      }
-    }
-
-    // Vehículo
-    setVehiculo({ placa: 'ABC123', marca: 'Kenworth', linea: 'T800', modelo: '2024' });
-
-    // Remolque
-    setRemolque({ placa: 'R98765', marca: 'Imecol', clase: 'Estacas', modelo: '2023' });
-
-    // Documentos
-    setDocumentos({
-      soatCumple: true, soatVencimiento: '2027-03-15',
-      revisionCumple: true, revisionVencimiento: '2027-01-20',
-      polizaCumple: true, polizaVencimiento: '2027-05-10',
-      licenciaCumple: true,
-    });
-
-    // Condiciones
-    setHorasDormir('8');
-    setKilometrajeInicial('125000');
-
-    // Items preoperacional - todos cumplen
-    const itemsPreop: Record<number, EstadoItemPreoperacional> = {};
-    [...ITEMS_SEGURIDAD, ...ITEMS_GENERALES, ...ITEMS_MECANICOS, ...ITEMS_CORREAS, ...ITEMS_HIGIENE, ...ITEMS_SALUD].forEach(item => {
-      itemsPreop[item.id] = { cumple: true, observacion: '' };
-    });
-    setItemsPreoperacional(itemsPreop);
-
-    // Kit de derrame - todos Buenos
-    const kitItems: Record<number, EstadoItemKitDerrame> = {};
-    [...ITEMS_KIT_DERRAME, ...PREGUNTAS_KIT_DERRAME].forEach(item => {
-      kitItems[item.id] = { estado: 'B', observacion: '' };
-    });
-    setItemsKitDerrame(kitItems);
-
-    // Botiquín - todos Buenos con cantidad
-    const botItems: Record<number, EstadoItemBotiquin> = {};
-    ITEMS_BOTIQUIN.forEach(item => {
-      botItems[item.id] = {
-        estado: 'B',
-        cantidad: item.cantidad.toString(),
-        fechaVencimiento: item.tieneVencimiento ? '2027-08-01' : '',
-        observacion: '',
-      };
-    });
-    setItemsBotiquin(botItems);
-
-    // Extintor - todos Buenos
-    const extItems: Record<number, EstadoItemExtintor> = {};
-    ITEMS_EXTINTOR.forEach(item => {
-      extItems[item.id] = { estado: 'B', observacion: '' };
-    });
-    setItemsExtintor(extItems);
-
-    // Fechas del extintor
-    setFechaActualExtintor({ dia: '25', mes: '02', ano: '2026' });
-    setFechaProximaRecarga({ dia: '25', mes: '02', ano: '2027' });
-
-    // Observaciones
-    setObservacionesGenerales('Prueba de inspección - todos los items OK');
-
-    // Expandir todas las secciones
-    setSeccionesExpandidas({ preoperacional: true, kitDerrame: true, botiquin: true, extintor: true });
-    setPaginaActual(1);
-  };
-
   const irAPagina = (pagina: number) => {
     setPaginaActual(pagina);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1059,18 +979,7 @@ export default function InspeccionVehicularPage() {
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-center bg-gradient-to-r from-yellow-400 to-emerald-400 bg-clip-text text-transparent mb-2">
               {INFO_FORMATO.titulo}
             </h1>
-            <div className="flex items-center justify-center gap-3">
-              <p className="text-gray-300 text-sm capitalize">{fechaActual || 'Cargando fecha...'}</p>
-              <button
-                type="button"
-                onClick={preLlenarFormulario}
-                className="px-3 py-1.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg text-xs font-medium hover:bg-purple-500/30 transition-colors flex items-center gap-1.5"
-                title="Pre-llenar todos los campos con datos de prueba"
-              >
-                <span>🧪</span>
-                <span>Llenar para pruebas</span>
-              </button>
-            </div>
+            <p className="text-gray-300 text-sm capitalize text-center">{fechaActual || 'Cargando fecha...'}</p>
           </div>
 
           {/* Leyenda de Calificación */}
