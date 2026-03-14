@@ -7,6 +7,8 @@ import {
   ITEMS_BOTIQUIN_FIELDS,
   ITEMS_EXTINTOR_FIELDS,
 } from '@/lib/airtable-config';
+import { generateInspeccionVehicularPDF } from '@/lib/pdf-generator';
+import { uploadPDFToCloudinary } from '@/lib/cloudinary';
 
 // ===========================================
 // CATÁLOGO DE ÍTEMS (single source of truth)
@@ -367,6 +369,87 @@ export async function POST(request: NextRequest) {
       await airtableBatchPost(config.BASE_ID, config.TABLE_ITEMS_EXTINTOR, config.API_KEY, rows);
     }
 
+    // ── 6. GENERAR PDF PROFESIONAL ─────────────────────────────────────────
+    let pdfUrl = '';
+    try {
+      const codigoInspeccion = (headerRecord.fields?.['Codigo Inspeccion'] as string) || headerRecord.id;
+      const pdfBuffer = await generateInspeccionVehicularPDF({
+        codigoInspeccion,
+        fecha: new Date().toISOString().split('T')[0],
+        conductor: {
+          id: conductor?.id || '',
+          nombre: conductor?.nombre || '',
+          cedula: conductor?.cedula || '',
+          edad: conductor?.edad?.toString(),
+          eps: conductor?.eps,
+          arl: conductor?.arl,
+          fondoPension: conductor?.fondoPension,
+          rh: conductor?.rh,
+        },
+        vehiculo: {
+          placa: vehiculo?.placa || '',
+          marca: vehiculo?.marca || '',
+          linea: vehiculo?.linea || '',
+          modelo: vehiculo?.modelo || '',
+        },
+        remolque: {
+          placa: remolque?.placa || '',
+          marca: remolque?.marca || '',
+          clase: remolque?.clase || '',
+          modelo: remolque?.modelo || '',
+        },
+        documentos: {
+          soat: { cumple: documentos?.soat?.cumple ?? null, vencimiento: documentos?.soat?.vencimiento || '' },
+          rtm: { cumple: documentos?.rtm?.cumple ?? null, vencimiento: documentos?.rtm?.vencimiento || '' },
+          poliza: { cumple: documentos?.poliza?.cumple ?? null, vencimiento: documentos?.poliza?.vencimiento || '' },
+          licencia: {
+            cumple: documentos?.licencia?.cumple ?? null,
+            categorias: documentos?.licencia?.categorias || [],
+            vigencias: documentos?.licencia?.vigencias || {},
+          },
+        },
+        condiciones: {
+          horasDormir: condiciones?.horasDormir || 0,
+          kilometrajeInicial: condiciones?.kilometrajeInicial || 0,
+        },
+        itemsVerificacion: itemsVerificacion || {},
+        kitDerrame: kitDerrame || {},
+        botiquin: botiquin || {},
+        extintor: {
+          items: extintor?.items || {},
+          fechaActual: extintor?.fechaActual,
+          fechaProximaRecarga: extintor?.fechaProximaRecarga,
+        },
+        firma: firma || '',
+        observacionesGenerales: observacionesGenerales || '',
+        totales: {
+          cumple: totalCumple,
+          noCumple: totalNoCumple,
+          porcentaje: `${porcentaje}%`,
+          bueno: totalBueno,
+          regular: totalRegular,
+          malo: totalMalo,
+          noTiene: totalNoTiene,
+        },
+      });
+
+      const fileName = `IV-${codigoInspeccion}-${Date.now()}`;
+      const uploadResult = await uploadPDFToCloudinary(pdfBuffer, fileName, 'Equinox/InspeccionesVehiculares');
+      pdfUrl = uploadResult.secure_url;
+
+      // Actualizar registro con URL del PDF
+      const patchUrl = `https://api.airtable.com/v0/${config.BASE_ID}/${config.TABLE_ID}/${headerRecord.id}`;
+      await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${config.API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { [INSPECCION_VEHICULAR_FIELDS.PDF_URL]: pdfUrl } }),
+      });
+    } catch (pdfError) {
+      console.error('Error generando/subiendo PDF:', pdfError instanceof Error ? pdfError.message : pdfError);
+      console.error('PDF Error stack:', pdfError instanceof Error ? pdfError.stack : 'No stack');
+      // No fallar la inspección si el PDF falla — los datos ya se guardaron
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -374,6 +457,7 @@ export async function POST(request: NextRequest) {
         data: {
           recordId: headerRecord.id,
           codigoInspeccion: headerRecord.fields?.['Codigo Inspeccion'] || headerRecord.id,
+          pdfUrl,
           totales: {
             preoperacional: { cumple: totalCumple, noCumple: totalNoCumple, porcentaje: `${porcentaje}%` },
             estadoItems:    { bueno: totalBueno, regular: totalRegular, malo: totalMalo, noTiene: totalNoTiene },

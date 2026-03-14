@@ -113,6 +113,7 @@ interface InspeccionVehicular {
   nombreHseq: string | null;
   fechaRevisionHseq: string | null;
   observacionesHseq: string | null;
+  pdfUrl: string | null;
 }
 
 interface User {
@@ -160,12 +161,14 @@ export default function DashboardPage() {
     autorizacionMonitoreo: boolean;
   } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsDecryptionFailed, setGpsDecryptionFailed] = useState(false);
 
   // Función para obtener datos GPS desencriptados
   const fetchGPSData = async (inspeccionId: string) => {
     setGpsLoading(true);
     setGpsError(null);
     setGpsData(null);
+    setGpsDecryptionFailed(false);
     
     try {
       const res = await fetch('/api/inspecciones/gps', {
@@ -183,9 +186,10 @@ export default function DashboardPage() {
       
       if (data.gpsData) {
         setGpsData(data.gpsData);
+        setGpsDecryptionFailed(!!data.decryptionFailed);
         setShowGPSModal(true);
       } else {
-        setGpsError('No hay datos GPS registrados para esta inspección');
+        setGpsError(data.message || 'No hay datos GPS registrados para esta inspección');
       }
     } catch (error) {
       setGpsError(error instanceof Error ? error.message : 'Error al obtener datos GPS');
@@ -414,6 +418,7 @@ export default function DashboardPage() {
               nombreHseq: fields['Nombre HSEQ'] || null,
               fechaRevisionHseq: fields['Fecha Revision HSEQ'] || null,
               observacionesHseq: fields['Observaciones HSEQ'] || null,
+              pdfUrl: fields['PDF URL'] || null,
             };
           });
           
@@ -1310,6 +1315,16 @@ export default function DashboardPage() {
                               >
                                 Ver detalles
                               </button>
+                              {insp.pdfUrl && (
+                                <a
+                                  href={insp.pdfUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+                                >
+                                  Ver PDF
+                                </a>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -1360,6 +1375,16 @@ export default function DashboardPage() {
                           >
                             Ver detalles completos
                           </button>
+                          {insp.pdfUrl && (
+                            <a
+                              href={insp.pdfUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full mt-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium text-center block"
+                            >
+                              Ver PDF
+                            </a>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1994,6 +2019,22 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* Link al PDF */}
+              {selectedInspeccionVehicular.pdfUrl && (
+                <div className="bg-white/5 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-yellow-400 mb-3">Documento</h3>
+                  <a
+                    href={selectedInspeccionVehicular.pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <span>Ver PDF Inspección Vehicular</span>
+                  </a>
+                </div>
+              )}
+
               {/* Información de Revisión HSEQ (si ya fue revisado) */}
               {selectedInspeccionVehicular.estadoInspeccion !== 'Pendiente' && selectedInspeccionVehicular.nombreHseq && (
                 <div className={`rounded-xl p-4 ${selectedInspeccionVehicular.estadoInspeccion === 'Aprobado' ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'}`}>
@@ -2066,6 +2107,17 @@ export default function DashboardPage() {
                   <span>Estos datos son confidenciales. No los comparta con terceros.</span>
                 </div>
               </div>
+
+              {gpsDecryptionFailed && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                  <div className="flex items-center space-x-2 text-red-400 text-sm">
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>No se pudieron desencriptar las credenciales GPS. El conductor debe actualizar sus datos GPS en el próximo formulario preoperacional.</span>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3">
                 {gpsData.nombre && (

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/jwt';
-import { decrypt } from '@/lib/encryption';
+import { decrypt, isEncrypted } from '@/lib/encryption';
 import { applyRateLimit } from '@/lib/rate-limit';
 import cookie from 'cookie';
 import { getInspeccionesConfig, getConductoresConfig, TABLES } from '@/lib/airtable-config';
@@ -143,13 +143,21 @@ export async function POST(request: NextRequest) {
 
     try {
       gpsUsuario = gpsUsuarioEncriptado ? decrypt(gpsUsuarioEncriptado) : '';
+    } catch (decryptError) {
+      console.error('Error desencriptando GPS usuario:', decryptError);
+      // Si tiene formato encriptado, no devolver el texto cifrado al cliente
+      gpsUsuario = isEncrypted(gpsUsuarioEncriptado) ? '' : gpsUsuarioEncriptado;
+    }
+
+    try {
       gpsPassword = gpsPasswordEncriptado ? decrypt(gpsPasswordEncriptado) : '';
     } catch (decryptError) {
-      console.error('Error desencriptando datos GPS:', decryptError);
-      // Si falla el descifrado, podría ser texto plano (datos antiguos)
-      gpsUsuario = gpsUsuarioEncriptado;
-      gpsPassword = gpsPasswordEncriptado;
+      console.error('Error desencriptando GPS password:', decryptError);
+      gpsPassword = isEncrypted(gpsPasswordEncriptado) ? '' : gpsPasswordEncriptado;
     }
+
+    const decryptionFailed = 
+      (gpsUsuarioEncriptado && !gpsUsuario) || (gpsPasswordEncriptado && !gpsPassword);
 
     // Log de auditoría (sin mostrar los datos sensibles)
     console.log(`[GPS ACCESS] Usuario ${user.cedula} (${user.nombre}) accedió a datos GPS de inspección ${inspeccionId}`);
@@ -162,6 +170,7 @@ export async function POST(request: NextRequest) {
         password: gpsPassword,
         autorizacionMonitoreo: gpsAutorizacion,
       },
+      decryptionFailed,
       accessedBy: user.nombre,
       accessedAt: new Date().toISOString(),
     });

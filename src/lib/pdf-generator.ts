@@ -653,3 +653,463 @@ export async function generatePreoperacionalPDF(data: PreoperacionalPDFData): Pr
   const pdfBytes = await doc.save();
   return Buffer.from(pdfBytes);
 }
+
+
+// ================================================================
+// GENERADOR PDF — INSPECCIÓN VEHICULAR (5 secciones, 97 ítems)
+// ================================================================
+
+export interface InspeccionVehicularPDFData {
+  codigoInspeccion: string;
+  fecha: string;
+  conductor: {
+    id: string;
+    nombre: string;
+    cedula: string;
+    edad?: string;
+    eps?: string;
+    arl?: string;
+    fondoPension?: string;
+    rh?: string;
+  };
+  vehiculo: { placa: string; marca: string; linea: string; modelo: string };
+  remolque: { placa: string; marca: string; clase: string; modelo: string };
+  documentos: {
+    soat:     { cumple: boolean | null; vencimiento: string };
+    rtm:      { cumple: boolean | null; vencimiento: string };
+    poliza:   { cumple: boolean | null; vencimiento: string };
+    licencia: { cumple: boolean | null; categorias: string[]; vigencias: Record<string, string> };
+  };
+  condiciones: { horasDormir: number; kilometrajeInicial: number };
+  itemsVerificacion: Record<number, { cumple: boolean | null; observacion?: string }>;
+  kitDerrame:        Record<number, { estado: string | null; observacion?: string }>;
+  botiquin:          Record<number, { estado: string | null; cantidad?: string; fechaVencimiento?: string; observacion?: string }>;
+  extintor: {
+    items: Record<number, { estado: string | null; observacion?: string }>;
+    fechaActual?: { dia: string; mes: string; ano: string };
+    fechaProximaRecarga?: { dia: string; mes: string; ano: string };
+  };
+  firma: string;
+  observacionesGenerales: string;
+  totales: {
+    cumple: number;
+    noCumple: number;
+    porcentaje: string;
+    bueno: number;
+    regular: number;
+    malo: number;
+    noTiene: number;
+  };
+}
+
+// Catálogos ítems vehicular (mismo orden que API route)
+const VEH_PREOP = [
+  { id: 1,  nombre: 'Extintor de Incendios (20 lb × 2 uds)', cat: 'Seguridad' },
+  { id: 2,  nombre: 'Equipo de Carretera', cat: 'Seguridad' },
+  { id: 3,  nombre: 'Botiquín de primeros auxilios', cat: 'Seguridad' },
+  { id: 4,  nombre: 'Cinturones de seguridad operativos', cat: 'Seguridad' },
+  { id: 5,  nombre: 'Bocina (claxon)', cat: 'Seguridad' },
+  { id: 6,  nombre: 'Luces (altas, bajas, direccionales)', cat: 'Seguridad' },
+  { id: 7,  nombre: 'Espejos (laterales) y lente angular', cat: 'Seguridad' },
+  { id: 8,  nombre: 'Papeles retrovisores ajustados', cat: 'Seguridad' },
+  { id: 9,  nombre: 'Señalización adecuada', cat: 'Generales' },
+  { id: 10, nombre: 'Estado general Tanque (sin fugas)', cat: 'Generales' },
+  { id: 11, nombre: 'Tanque con tapa en buen estado', cat: 'Generales' },
+  { id: 12, nombre: 'Estado y limpieza de la cabina', cat: 'Generales' },
+  { id: 13, nombre: 'Estado general de las llantas', cat: 'Generales' },
+  { id: 14, nombre: 'Llanta de repuesto', cat: 'Generales' },
+  { id: 15, nombre: 'Rines y contrapesos', cat: 'Generales' },
+  { id: 16, nombre: 'Sistema de frenos', cat: 'Generales' },
+  { id: 17, nombre: 'Freno de estacionamiento', cat: 'Generales' },
+  { id: 18, nombre: 'Sistema de dirección', cat: 'Generales' },
+  { id: 19, nombre: 'Estado del motor', cat: 'Generales' },
+  { id: 20, nombre: 'Nivel de fluidos', cat: 'Generales' },
+  { id: 21, nombre: 'Suspensión y amortiguadores', cat: 'Generales' },
+  { id: 22, nombre: 'Luces (delanteras, traseras, dir. y freno)', cat: 'Generales' },
+  { id: 23, nombre: 'Ausencia fugas de fluidos', cat: 'Generales' },
+  { id: 24, nombre: 'Herramientas básicas y gato hidráulico', cat: 'Generales' },
+  { id: 25, nombre: 'Punto de anclaje fijo', cat: 'Generales' },
+  { id: 26, nombre: 'Cable de acero', cat: 'Generales' },
+  { id: 27, nombre: 'Estado de los espejos', cat: 'Generales' },
+  { id: 28, nombre: 'Listado del torque', cat: 'Generales' },
+  { id: 29, nombre: 'Caja de cambios', cat: 'Mecánico' },
+  { id: 30, nombre: 'Amortiguadores y resortes', cat: 'Mecánico' },
+  { id: 31, nombre: 'Componentes de suspensión', cat: 'Mecánico' },
+  { id: 32, nombre: 'Nivel y estado del refrigerante', cat: 'Mecánico' },
+  { id: 33, nombre: 'Fugas en mangueras y sellantes', cat: 'Mecánico' },
+  { id: 34, nombre: 'Frenos de emergencia y servicio', cat: 'Mecánico' },
+  { id: 35, nombre: 'Estado de la batería', cat: 'Mecánico' },
+  { id: 36, nombre: 'Lubricación y engrase general', cat: 'Mecánico' },
+  { id: 37, nombre: 'Sistema de escape', cat: 'Mecánico' },
+  { id: 38, nombre: 'Correas (ventilador, alternador, compresor)', cat: 'Correas' },
+  { id: 39, nombre: 'Desinfección y limpieza cabina', cat: 'Higiene' },
+  { id: 40, nombre: 'Descanso apropiado antes de jornada', cat: 'Salud' },
+  { id: 41, nombre: 'Bajo tratamiento médico / medicamento', cat: 'Salud' },
+  { id: 42, nombre: 'Trastorno de ansiedad o depresión', cat: 'Salud' },
+  { id: 43, nombre: 'Trastorno neurológico o visual', cat: 'Salud' },
+  { id: 44, nombre: 'Condiciones de salud apropiadas', cat: 'Salud' },
+];
+const VEH_KIT = [
+  { id: 101, nombre: 'Paños Absorbentes' },
+  { id: 102, nombre: 'Barrera Absorbente' },
+  { id: 103, nombre: 'Traje Desechable' },
+  { id: 104, nombre: 'Bolsa Roja Residuos' },
+  { id: 105, nombre: 'Pala Plástica' },
+  { id: 106, nombre: 'Espátula Plástica' },
+  { id: 107, nombre: 'Guantes de Nitrilo' },
+  { id: 108, nombre: 'Gafas de Seguridad' },
+  { id: 109, nombre: 'Cinta de Peligro' },
+  { id: 110, nombre: 'Martillo de Goma' },
+  { id: 111, nombre: 'Recogedor de Mano' },
+  { id: 112, nombre: 'Respirador / N-95' },
+  { id: 113, nombre: 'Linterna Recargable' },
+  { id: 114, nombre: 'Granulado Absorbente' },
+  { id: 115, nombre: 'Masilla Epóxica' },
+  { id: 116, nombre: 'Desengrasante Biodegradable' },
+  { id: 117, nombre: 'Chaleco Antireflectivo' },
+  { id: 118, nombre: 'Conos' },
+  { id: 119, nombre: '¿Conoce procedimiento de uso?' },
+  { id: 120, nombre: '¿Almacenado en lugar seco?' },
+  { id: 121, nombre: '¿Caneca rotulada/señalizada?' },
+];
+const VEH_BOTIQUIN = [
+  { id: 201, nombre: 'Gasas', std: 10 },
+  { id: 202, nombre: 'Esparadrapo', std: 1 },
+  { id: 203, nombre: 'Bajalenguas', std: 10 },
+  { id: 204, nombre: 'Guantes de Latex', std: 5 },
+  { id: 205, nombre: 'Aplicadores / Copitos', std: 1 },
+  { id: 206, nombre: 'Venda Elástica 2X5', std: 1 },
+  { id: 207, nombre: 'Venda Elástica 3X5', std: 1 },
+  { id: 208, nombre: 'Venda Elástica 5X5', std: 1 },
+  { id: 209, nombre: 'Venda de Algodón 3X5', std: 1 },
+  { id: 210, nombre: 'Venda de Algodón 5X5', std: 1 },
+  { id: 211, nombre: 'Yodopovidona (Jabón)', std: 1 },
+  { id: 212, nombre: 'Solución Salina 250-500cc', std: 1 },
+  { id: 213, nombre: 'Tapabocas', std: 3 },
+  { id: 214, nombre: 'Alcohol Antiséptico 275ml', std: 1 },
+  { id: 215, nombre: 'Curas', std: 5 },
+  { id: 216, nombre: 'Jeringa de 5 ml', std: 1 },
+  { id: 217, nombre: 'Tijeras de Trauma', std: 1 },
+  { id: 218, nombre: 'Parche Ocular', std: 3 },
+  { id: 219, nombre: 'Termómetro', std: 1 },
+  { id: 220, nombre: 'Libreta', std: 1 },
+  { id: 221, nombre: 'Lapicero', std: 1 },
+  { id: 222, nombre: 'Manual de Emergencia', std: 1 },
+];
+const VEH_EXTINTOR = [
+  { id: 301, nombre: 'Presión' },
+  { id: 302, nombre: 'Sello de Garantía' },
+  { id: 303, nombre: 'Manómetro' },
+  { id: 304, nombre: 'Estado del Cilindro' },
+  { id: 305, nombre: 'Manija' },
+  { id: 306, nombre: 'Boquilla o Manguera' },
+  { id: 307, nombre: 'Anillo de Seguridad' },
+  { id: 308, nombre: 'Pin de Seguridad' },
+  { id: 309, nombre: 'Pintura' },
+  { id: 310, nombre: 'Tarjeta de Inspección' },
+];
+
+// –– helpers for estado-based tables (B/R/M/NT) ––
+const ESTADO_LABELS: Record<string, { text: string; color: ReturnType<typeof rgb> }> = {
+  B:  { text: 'Bueno',    color: rgb(0.13, 0.77, 0.37) },
+  R:  { text: 'Regular',  color: rgb(0.96, 0.62, 0.04) },
+  M:  { text: 'Malo',     color: rgb(0.94, 0.27, 0.27) },
+  NT: { text: 'No Tiene', color: rgb(0.42, 0.45, 0.5)  },
+};
+
+function drawEstadoTable(
+  ctx: PDFContext,
+  title: string,
+  items: { id: number; nombre: string }[],
+  data: Record<number, { estado?: string | null; observacion?: string }>,
+  extraCols?: { label: string; getter: (id: number) => string }[],
+): PDFContext {
+  ctx = drawSectionTitle(ctx, title);
+  const { margin, pageWidth, fontBold, fontRegular } = ctx;
+  const tableW = pageWidth - margin * 2;
+  const colId = 22;
+  const colEstado = 48;
+  const colObs = 60;
+  const colExtra = extraCols ? extraCols.length * 52 : 0;
+  const colNombre = tableW - colId - colEstado - colObs - colExtra;
+
+  // header
+  ctx = ensureSpace(ctx, 16);
+  let y = ctx.y;
+  ctx.page.drawRectangle({ x: margin, y: y - 12, width: tableW, height: 14, color: C.lightGray });
+  let hx = margin + 4;
+  ctx.page.drawText('#', { x: hx, y: y - 9, size: 5.5, font: fontBold, color: C.darkText }); hx += colId;
+  ctx.page.drawText('Ítem', { x: hx, y: y - 9, size: 5.5, font: fontBold, color: C.darkText }); hx += colNombre;
+  ctx.page.drawText('Estado', { x: hx, y: y - 9, size: 5.5, font: fontBold, color: C.darkText }); hx += colEstado;
+  if (extraCols) {
+    for (const ec of extraCols) {
+      ctx.page.drawText(ec.label, { x: hx, y: y - 9, size: 5.5, font: fontBold, color: C.darkText }); hx += 52;
+    }
+  }
+  ctx.page.drawText('Obs.', { x: hx, y: y - 9, size: 5.5, font: fontBold, color: C.darkText });
+  y -= 16;
+
+  for (const item of items) {
+    ctx = ensureSpace({ ...ctx, y }, 13);
+    y = ctx.y;
+    const d = data[item.id] || {};
+    if (item.id % 2 === 0) {
+      ctx.page.drawRectangle({ x: margin, y: y - 10, width: tableW, height: 12, color: rgb(0.98, 0.98, 0.99) });
+    }
+    let rx = margin + 4;
+    ctx.page.drawText(String(item.id), { x: rx, y: y - 8, size: 5.5, font: fontRegular, color: C.darkText }); rx += colId;
+    ctx.page.drawText(truncate(item.nombre, 48), { x: rx, y: y - 8, size: 5.5, font: fontRegular, color: C.darkText }); rx += colNombre;
+    const est = ESTADO_LABELS[d.estado || 'NT'] || ESTADO_LABELS.NT;
+    ctx.page.drawText(est.text, { x: rx, y: y - 8, size: 5.5, font: fontBold, color: est.color }); rx += colEstado;
+    if (extraCols) {
+      for (const ec of extraCols) {
+        ctx.page.drawText(truncate(ec.getter(item.id), 10), { x: rx, y: y - 8, size: 5.5, font: fontRegular, color: C.darkText }); rx += 52;
+      }
+    }
+    ctx.page.drawText(truncate(d.observacion || '', 16), { x: rx, y: y - 8, size: 5, font: fontRegular, color: C.gray });
+    y -= 12;
+  }
+  return { ...ctx, y: y - 4 };
+}
+
+function drawVehDocRow(ctx: PDFContext, label: string, cumple: boolean | null, vencimiento: string): PDFContext {
+  ctx = ensureSpace(ctx, 14);
+  const { fontBold, fontRegular, margin } = ctx;
+  let y = ctx.y;
+  ctx.page.drawText(label + ':', { x: margin + 10, y, size: 7.5, font: fontBold, color: C.darkText });
+  if (cumple === true) {
+    ctx.page.drawText('VIGENTE', { x: margin + 110, y, size: 7.5, font: fontBold, color: C.green });
+  } else if (cumple === false) {
+    ctx.page.drawText('NO VIGENTE', { x: margin + 110, y, size: 7.5, font: fontBold, color: C.red });
+  } else {
+    ctx.page.drawText('N/A', { x: margin + 110, y, size: 7.5, font: fontRegular, color: C.gray });
+  }
+  if (vencimiento) {
+    ctx.page.drawText('Vence: ' + formatDateStr(vencimiento), { x: margin + 200, y, size: 7, font: fontRegular, color: C.gray });
+  }
+  y -= 14;
+  return { ...ctx, y };
+}
+
+// –– MAIN GENERATOR ––
+
+export async function generateInspeccionVehicularPDF(data: InspeccionVehicularPDFData): Promise<Buffer> {
+  const doc = await PDFDocument.create();
+  doc.setTitle('Inspección Vehicular - ' + data.codigoInspeccion);
+  doc.setAuthor('TRANSPORTE Y LOGISTICA EQUINOX S.A.S.');
+  doc.setSubject('Formato de Inspección Vehicular');
+  doc.setCreator('Equinox Enterprise System');
+
+  const fontRegular = await doc.embedFont(StandardFonts.Helvetica);
+  const fontBold    = await doc.embedFont(StandardFonts.HelveticaBold);
+  const pw = 612, ph = 792, m = 40;
+
+  const firstPage = doc.addPage([pw, ph]);
+  let ctx: PDFContext = { doc, page: firstPage, y: ph - 10, fontRegular, fontBold, pageWidth: pw, pageHeight: ph, margin: m };
+
+  // ── HEADER ────────────────────────────────────────────────────────────────
+  const drawVehHeader = (c: PDFContext): PDFContext => {
+    const { page, pageWidth: w, margin: mg } = c;
+    page.drawRectangle({ x: 0, y: ph - 4, width: w, height: 4, color: C.accent });
+    const hH = 58, hY = c.y - hH;
+    page.drawRectangle({ x: mg, y: hY, width: w - mg * 2, height: hH, color: C.primary });
+    page.drawText('TRANSPORTE Y LOGISTICA EQUINOX S.A.S.', { x: mg + 12, y: hY + hH - 17, size: 11, font: fontBold, color: C.accent });
+    page.drawText('NIT: 901.870.510-5', { x: mg + 12, y: hY + hH - 28, size: 7, font: fontRegular, color: C.white });
+    page.drawText('FORMATO DE INSPECCIÓN VEHICULAR', { x: mg + 12, y: hY + hH - 41, size: 9, font: fontBold, color: C.white });
+    // Code box
+    const bW = 130, bX = w - mg - bW - 5;
+    page.drawRectangle({ x: bX, y: hY + 5, width: bW, height: hH - 10, color: C.headerBg });
+    page.drawText('CODIGO', { x: bX + 8, y: hY + hH - 17, size: 6, font: fontBold, color: C.accent });
+    page.drawText('HSEQ-FOR-065', { x: bX + 8, y: hY + hH - 27, size: 7, font: fontRegular, color: C.white });
+    page.drawText('INSPECCIÓN', { x: bX + 8, y: hY + hH - 38, size: 6, font: fontBold, color: C.accent });
+    page.drawText(data.codigoInspeccion || 'PENDIENTE', { x: bX + 8, y: hY + hH - 48, size: 7, font: fontRegular, color: C.white });
+    let ny = hY - 8;
+    page.drawText('Fecha: ' + formatDateStr(data.fecha), { x: mg + 5, y: ny, size: 7, font: fontRegular, color: C.gray });
+    page.drawText('ID Conductor: ' + (data.conductor.id || data.conductor.cedula), { x: w / 2 + 30, y: ny, size: 7, font: fontRegular, color: C.gray });
+    return { ...c, y: ny - 14 };
+  };
+
+  ctx = drawVehHeader(ctx);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PAGE 1 — DATOS GENERALES + DOCUMENTOS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  ctx = drawSectionTitle(ctx, 'DATOS DEL CONDUCTOR');
+  ctx = drawInfoGrid(ctx, [
+    { label: 'Nombre', value: data.conductor.nombre },
+    { label: 'Cédula', value: data.conductor.cedula },
+    { label: 'Edad', value: data.conductor.edad || 'N/A' },
+    { label: 'EPS', value: data.conductor.eps || 'N/A' },
+    { label: 'ARL', value: data.conductor.arl || 'N/A' },
+    { label: 'Fondo Pensión', value: data.conductor.fondoPension || 'N/A' },
+    { label: 'RH', value: data.conductor.rh || 'N/A' },
+  ], 4);
+
+  ctx = drawSectionTitle(ctx, 'DATOS DEL VEHÍCULO');
+  ctx = drawInfoGrid(ctx, [
+    { label: 'Placa', value: data.vehiculo.placa },
+    { label: 'Marca', value: data.vehiculo.marca },
+    { label: 'Línea', value: data.vehiculo.linea },
+    { label: 'Modelo', value: data.vehiculo.modelo },
+  ], 4);
+
+  ctx = drawSectionTitle(ctx, 'DATOS DEL REMOLQUE');
+  ctx = drawInfoGrid(ctx, [
+    { label: 'Placa', value: data.remolque.placa },
+    { label: 'Marca', value: data.remolque.marca },
+    { label: 'Clase', value: data.remolque.clase },
+    { label: 'Modelo', value: data.remolque.modelo },
+  ], 4);
+
+  ctx = drawSectionTitle(ctx, 'DOCUMENTOS Y VIGENCIAS');
+  ctx = drawVehDocRow(ctx, 'SOAT', data.documentos.soat.cumple, data.documentos.soat.vencimiento);
+  ctx = drawVehDocRow(ctx, 'Revisión Técnico Mecánica', data.documentos.rtm.cumple, data.documentos.rtm.vencimiento);
+  ctx = drawVehDocRow(ctx, 'Póliza de Responsabilidad Civil', data.documentos.poliza.cumple, data.documentos.poliza.vencimiento);
+  ctx = drawVehDocRow(ctx, 'Licencia de Conducción', data.documentos.licencia.cumple, '');
+  if (data.documentos.licencia.categorias?.length) {
+    const cats = data.documentos.licencia.categorias.map(c => {
+      const v = data.documentos.licencia.vigencias?.[c];
+      return v ? `${c} (${formatDateStr(v)})` : c;
+    }).join(', ');
+    ctx = ensureSpace(ctx, 14);
+    ctx.page.drawText('    Categorías: ' + cats, { x: m + 10, y: ctx.y, size: 7, font: fontRegular, color: C.gray });
+    ctx.y -= 14;
+  }
+
+  ctx = drawSectionTitle(ctx, 'CONDICIONES DEL CONDUCTOR');
+  ctx = drawInfoGrid(ctx, [
+    { label: 'Horas de Descanso', value: data.condiciones.horasDormir + ' horas' },
+    { label: 'Kilometraje Inicial', value: data.condiciones.kilometrajeInicial + ' km' },
+  ], 2);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECCIÓN 1 — ÍTEMS PREOPERACIONALES (44 ítems Cumple/NoC)
+  // ══════════════════════════════════════════════════════════════════════════
+  ctx = addNewPage(ctx);
+  ctx = drawVehHeader(ctx);
+
+  // Agrupar por categoría
+  const categorias: string[] = ['Seguridad', 'Generales', 'Mecánico', 'Correas', 'Higiene', 'Salud'];
+  for (const cat of categorias) {
+    const items = VEH_PREOP.filter(i => i.cat === cat);
+    ctx = drawItemsTable(ctx, cat.toUpperCase(), items, data.itemsVerificacion as any);
+  }
+
+  // Resumen cumplimiento preoperacional
+  ctx = ensureSpace(ctx, 28);
+  const pBg = data.totales.noCumple === 0 ? C.greenBg : C.redBg;
+  const pColor = data.totales.noCumple === 0 ? C.green : C.red;
+  const pText = data.totales.noCumple === 0
+    ? `TODOS LOS ÍTEMS CUMPLEN (${data.totales.porcentaje})`
+    : `${data.totales.noCumple} ÍTEM(S) NO CUMPLEN — ${data.totales.porcentaje}`;
+  ctx.page.drawRectangle({ x: m, y: ctx.y - 20, width: pw - m * 2, height: 22, color: pBg });
+  ctx.page.drawText(pText, { x: m + 16, y: ctx.y - 14, size: 9, font: fontBold, color: pColor });
+  ctx.y -= 30;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECCIÓN 2 — KIT DE DERRAME (21 ítems B/R/M/NT)
+  // ══════════════════════════════════════════════════════════════════════════
+  ctx = drawEstadoTable(ctx, 'KIT CONTROL DE DERRAMES', VEH_KIT, data.kitDerrame);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECCIÓN 3 — BOTIQUÍN (22 ítems + cantidad + vencimiento)
+  // ══════════════════════════════════════════════════════════════════════════
+  ctx = drawEstadoTable(ctx, 'BOTIQUÍN DE PRIMEROS AUXILIOS', VEH_BOTIQUIN, data.botiquin as any, [
+    { label: 'Cant.', getter: (id) => (data.botiquin[id]?.cantidad || VEH_BOTIQUIN.find(b => b.id === id)?.std?.toString() || '') },
+    { label: 'Vence', getter: (id) => data.botiquin[id]?.fechaVencimiento ? formatDateStr(data.botiquin[id].fechaVencimiento!) : '' },
+  ]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECCIÓN 4 — EXTINTOR (10 ítems + fechas)
+  // ══════════════════════════════════════════════════════════════════════════
+  ctx = drawEstadoTable(ctx, 'INSPECCIÓN DEL EXTINTOR', VEH_EXTINTOR, data.extintor.items);
+  // Fechas del extintor
+  if (data.extintor.fechaActual?.dia || data.extintor.fechaProximaRecarga?.dia) {
+    ctx = ensureSpace(ctx, 20);
+    const fa = data.extintor.fechaActual;
+    const fp = data.extintor.fechaProximaRecarga;
+    if (fa?.dia) ctx.page.drawText(`Fecha Actual: ${fa.dia}/${fa.mes}/${fa.ano}`, { x: m + 10, y: ctx.y, size: 7, font: fontRegular, color: C.darkText });
+    if (fp?.dia) ctx.page.drawText(`Próxima Recarga: ${fp.dia}/${fp.mes}/${fp.ano}`, { x: pw / 2, y: ctx.y, size: 7, font: fontRegular, color: C.darkText });
+    ctx.y -= 16;
+  }
+
+  // Resumen estados B/R/M/NT
+  ctx = ensureSpace(ctx, 28);
+  ctx.page.drawRectangle({ x: m, y: ctx.y - 20, width: pw - m * 2, height: 22, color: C.lightGray });
+  ctx.page.drawText(
+    `Bueno: ${data.totales.bueno}  |  Regular: ${data.totales.regular}  |  Malo: ${data.totales.malo}  |  No Tiene: ${data.totales.noTiene}`,
+    { x: m + 16, y: ctx.y - 14, size: 8, font: fontBold, color: C.darkText }
+  );
+  ctx.y -= 30;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // OBSERVACIONES GENERALES
+  // ══════════════════════════════════════════════════════════════════════════
+  if (data.observacionesGenerales) {
+    ctx = ensureSpace(ctx, 50);
+    ctx = drawSectionTitle(ctx, 'OBSERVACIONES GENERALES');
+    const lines = data.observacionesGenerales.match(/.{1,95}/g) || [data.observacionesGenerales];
+    for (const line of lines) {
+      ctx = ensureSpace(ctx, 12);
+      ctx.page.drawText(line, { x: m + 10, y: ctx.y, size: 7, font: fontRegular, color: C.darkText });
+      ctx.y -= 12;
+    }
+    ctx.y -= 6;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FIRMA
+  // ══════════════════════════════════════════════════════════════════════════
+  ctx = ensureSpace(ctx, 120);
+  ctx = drawSectionTitle(ctx, 'FIRMA DEL CONDUCTOR');
+
+  const sigW = 220, sigH = 55;
+  const sigX = m + 5;
+  const sigTopY = ctx.y;
+
+  if (data.firma && data.firma.startsWith('data:image/png;base64,')) {
+    try {
+      const b64 = data.firma.replace(/^data:image\/png;base64,/, '');
+      const bytes = Uint8Array.from(Buffer.from(b64, 'base64'));
+      const img = await doc.embedPng(bytes);
+      const scaled = img.scaleToFit(sigW - 10, sigH - 5);
+      ctx.page.drawImage(img, {
+        x: sigX + (sigW - scaled.width) / 2,
+        y: sigTopY - sigH + 3,
+        width: scaled.width,
+        height: scaled.height,
+      });
+    } catch {
+      ctx.page.drawText('[Firma digital registrada]', { x: sigX + 10, y: sigTopY - 30, size: 8, font: fontRegular, color: C.gray });
+    }
+  }
+  const lineY = sigTopY - sigH - 5;
+  ctx.page.drawLine({ start: { x: sigX, y: lineY }, end: { x: sigX + sigW, y: lineY }, thickness: 1, color: C.darkText });
+  ctx.page.drawText(data.conductor.nombre, { x: sigX + 5, y: lineY - 12, size: 8, font: fontBold, color: C.darkText });
+  ctx.page.drawText('C.C. ' + data.conductor.cedula, { x: sigX + 5, y: lineY - 22, size: 7, font: fontRegular, color: C.gray });
+  ctx.y = lineY - 35;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CERTIFICACIÓN
+  // ══════════════════════════════════════════════════════════════════════════
+  ctx = ensureSpace(ctx, 50);
+  ctx.page.drawRectangle({ x: m, y: ctx.y - 38, width: pw - m * 2, height: 40, color: C.warmBg });
+  ctx.page.drawText('Al firmar este documento, el conductor certifica que toda la información proporcionada es veraz', { x: m + 10, y: ctx.y - 12, size: 6, font: fontRegular, color: rgb(0.57, 0.25, 0.05) });
+  ctx.page.drawText('y que ha realizado la inspección vehicular antes de iniciar la jornada laboral.', { x: m + 10, y: ctx.y - 22, size: 6, font: fontRegular, color: rgb(0.57, 0.25, 0.05) });
+  ctx.page.drawText('Este documento fue generado electrónicamente por el sistema Equinox Enterprise.', { x: m + 10, y: ctx.y - 32, size: 6, font: fontRegular, color: rgb(0.57, 0.25, 0.05) });
+  ctx.y -= 50;
+
+  const now = new Date().toLocaleString('es-CO');
+  ctx.page.drawText('Generado: ' + now + ' | Sistema Equinox Enterprise v1.0', { x: m + 10, y: ctx.y, size: 5, font: fontRegular, color: C.gray });
+
+  // ── Page numbers + bottom bar ──
+  const pages = doc.getPages();
+  for (let i = 0; i < pages.length; i++) {
+    pages[i].drawRectangle({ x: 0, y: 0, width: pw, height: 4, color: C.accent });
+    pages[i].drawText(`Página ${i + 1} de ${pages.length}`, { x: pw / 2 - 30, y: 10, size: 6, font: fontRegular, color: C.gray });
+  }
+
+  const pdfBytes = await doc.save();
+  return Buffer.from(pdfBytes);
+}

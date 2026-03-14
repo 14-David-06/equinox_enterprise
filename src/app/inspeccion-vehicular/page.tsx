@@ -1,8 +1,86 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+
+// ==========================================
+// COMPONENTES EXTRAÍDOS (fuera del componente principal para evitar re-mounts)
+// ==========================================
+
+const EstadoButton = memo(function EstadoButton({ 
+  estado, 
+  selected, 
+  onClick 
+}: { 
+  estado: 'B' | 'R' | 'M' | 'NT'; 
+  selected: boolean; 
+  onClick: () => void;
+}) {
+  const colores = {
+    B: 'bg-green-500 hover:bg-green-600',
+    R: 'bg-yellow-500 hover:bg-yellow-600 text-black',
+    M: 'bg-red-500 hover:bg-red-600',
+    NT: 'bg-gray-500 hover:bg-gray-600',
+  };
+  const labels = { B: 'B', R: 'R', M: 'M', NT: 'NT' };
+  
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-9 h-9 rounded-lg font-bold text-xs transition-all ${
+        selected 
+          ? `${colores[estado]} ring-2 ring-white scale-110 shadow-lg` 
+          : 'bg-white/10 text-gray-400 hover:bg-white/20'
+      }`}
+    >
+      {labels[estado]}
+    </button>
+  );
+});
+
+function SeccionColapsable({ 
+  titulo, 
+  icono, 
+  color, 
+  cantidadItems, 
+  expanded,
+  onToggle,
+  children 
+}: { 
+  titulo: string; 
+  icono: string; 
+  color: string; 
+  cantidadItems: number;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={`backdrop-blur-xl bg-white/5 border border-${color}-500/30 rounded-xl p-4`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <h2 className={`text-lg font-bold text-${color}-400 flex items-center gap-2`}>
+          <span>{icono}</span>
+          <span>{titulo}</span>
+          <span className="text-xs font-normal text-gray-500">({cantidadItems} items)</span>
+        </h2>
+        <span className={`text-${color}-400 text-xl transition-transform ${expanded ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+      {expanded && (
+        <div className="mt-4 space-y-2">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
 
 // ==========================================
 // CONFIGURACIÓN DEL FORMATO
@@ -681,6 +759,7 @@ export default function InspeccionVehicularPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (paginaActual !== TOTAL_PAGINAS) return;
     if (!validarFormulario()) return;
     setIsLoading(true);
 
@@ -783,37 +862,6 @@ export default function InspeccionVehicularPage() {
   // ==========================================
   // COMPONENTES DE RENDER
   // ==========================================
-  const EstadoButton = ({ 
-    estado, 
-    selected, 
-    onClick 
-  }: { 
-    estado: 'B' | 'R' | 'M' | 'NT'; 
-    selected: boolean; 
-    onClick: () => void;
-  }) => {
-    const colores = {
-      B: 'bg-green-500 hover:bg-green-600',
-      R: 'bg-yellow-500 hover:bg-yellow-600 text-black',
-      M: 'bg-red-500 hover:bg-red-600',
-      NT: 'bg-gray-500 hover:bg-gray-600',
-    };
-    const labels = { B: 'B', R: 'R', M: 'M', NT: 'NT' };
-    
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`w-9 h-9 rounded-lg font-bold text-xs transition-all ${
-          selected 
-            ? `${colores[estado]} ring-2 ring-white scale-110 shadow-lg` 
-            : 'bg-white/10 text-gray-400 hover:bg-white/20'
-        }`}
-      >
-        {labels[estado]}
-      </button>
-    );
-  };
 
   const renderItemPreoperacional = (item: { id: number; nombre: string }) => {
     const estado = itemsPreoperacional[item.id] || { cumple: null, observacion: '' };
@@ -970,44 +1018,6 @@ export default function InspeccionVehicularPage() {
       </div>
     );
   };
-
-  const SeccionColapsable = ({ 
-    titulo, 
-    icono, 
-    color, 
-    seccionKey, 
-    cantidadItems, 
-    children 
-  }: { 
-    titulo: string; 
-    icono: string; 
-    color: string; 
-    seccionKey: keyof typeof seccionesExpandidas; 
-    cantidadItems: number;
-    children: React.ReactNode;
-  }) => (
-    <section className={`backdrop-blur-xl bg-white/5 border border-${color}-500/30 rounded-xl p-4`}>
-      <button
-        type="button"
-        onClick={() => toggleSeccion(seccionKey)}
-        className="w-full flex items-center justify-between text-left"
-      >
-        <h2 className={`text-lg font-bold text-${color}-400 flex items-center gap-2`}>
-          <span>{icono}</span>
-          <span>{titulo}</span>
-          <span className="text-xs font-normal text-gray-500">({cantidadItems} items)</span>
-        </h2>
-        <span className={`text-${color}-400 text-xl transition-transform ${seccionesExpandidas[seccionKey] ? 'rotate-180' : ''}`}>
-          ▼
-        </span>
-      </button>
-      {seccionesExpandidas[seccionKey] && (
-        <div className="mt-4 space-y-2">
-          {children}
-        </div>
-      )}
-    </section>
-  );
 
   // ==========================================
   // LOADING / AUTH CHECK
@@ -1408,7 +1418,7 @@ export default function InspeccionVehicularPage() {
 
             {/* PÁGINA 2: INSPECCIÓN PREOPERACIONAL */}
             {paginaActual === 2 && (
-            <SeccionColapsable titulo="INSPECCIÓN PREOPERACIONAL" icono="🔍" color="yellow" seccionKey="preoperacional" cantidadItems={44}>
+            <SeccionColapsable titulo="INSPECCIÓN PREOPERACIONAL" icono="🔍" color="yellow" expanded={seccionesExpandidas.preoperacional} onToggle={() => toggleSeccion('preoperacional')} cantidadItems={44}>
               <div className="space-y-4">
                 <div>
                   <h3 className="text-yellow-400/80 text-sm font-semibold mb-2">Condiciones de Seguridad</h3>
@@ -1440,7 +1450,7 @@ export default function InspeccionVehicularPage() {
 
             {/* PÁGINA 3: KIT DE DERRAME */}
             {paginaActual === 3 && (
-            <SeccionColapsable titulo="KIT CONTROL DE DERRAME" icono="🛢️" color="emerald" seccionKey="kitDerrame" cantidadItems={21}>
+            <SeccionColapsable titulo="KIT CONTROL DE DERRAME" icono="🛢️" color="emerald" expanded={seccionesExpandidas.kitDerrame} onToggle={() => toggleSeccion('kitDerrame')} cantidadItems={21}>
               <div className="space-y-2">
                 {ITEMS_KIT_DERRAME.map(item => renderItemKitDerrame(item))}
               </div>
@@ -1474,7 +1484,7 @@ export default function InspeccionVehicularPage() {
 
             {/* PÁGINA 4: BOTIQUÍN */}
             {paginaActual === 4 && (
-            <SeccionColapsable titulo="BOTIQUÍN DE PRIMEROS AUXILIOS" icono="🩺" color="blue" seccionKey="botiquin" cantidadItems={22}>
+            <SeccionColapsable titulo="BOTIQUÍN DE PRIMEROS AUXILIOS" icono="🩺" color="blue" expanded={seccionesExpandidas.botiquin} onToggle={() => toggleSeccion('botiquin')} cantidadItems={22}>
               <div className="space-y-2">
                 {ITEMS_BOTIQUIN.map(item => renderItemBotiquin(item))}
               </div>
@@ -1483,7 +1493,7 @@ export default function InspeccionVehicularPage() {
 
             {/* PÁGINA 5: EXTINTOR + OBSERVACIONES + FIRMA */}
             {paginaActual === 5 && (<>
-            <SeccionColapsable titulo="EXTINTOR" icono="🧯" color="red" seccionKey="extintor" cantidadItems={10}>
+            <SeccionColapsable titulo="EXTINTOR" icono="🧯" color="red" expanded={seccionesExpandidas.extintor} onToggle={() => toggleSeccion('extintor')} cantidadItems={10}>
               <div className="space-y-2">
                 {ITEMS_EXTINTOR.map(item => renderItemExtintor(item))}
               </div>
