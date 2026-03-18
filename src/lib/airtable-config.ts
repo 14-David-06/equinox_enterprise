@@ -132,11 +132,11 @@ export const AIRTABLE_CONFIG = getAirtableConfig();
 export const TABLES = {
   // Base: Equinox Users Core
   USUARIOS: {
-    ID: process.env.AIRTABLE_USUARIOS_TABLE_ID || '',
+    ID: process.env.AIRTABLE_EQUINOX_USERS_CORE_USUARIOS_TABLE_ID || '',
     NAME: 'USUARIOS',
   },
   LOGS: {
-    ID: process.env.AIRTABLE_LOGS_TABLE_ID || '',
+    ID: process.env.AIRTABLE_EQUINOX_USERS_CORE_LOGS_TABLE_ID || '',
     NAME: 'LOGS',
   },
   // Base: Conductores Core
