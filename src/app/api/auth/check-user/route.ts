@@ -82,11 +82,15 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Error in check-user endpoint', error, {
       endpoint: '/api/auth/check-user',
+      detail: errorMessage,
+      hasApiKey: !!process.env.AIRTABLE_EQUINOX_USERS_CORE_API_KEY,
+      hasBaseId: !!process.env.AIRTABLE_EQUINOX_USERS_CORE_BASE_ID,
     });
     return NextResponse.json(
-      { error: 'Error al verificar usuario' },
+      { error: 'Error al verificar usuario', detail: errorMessage },
       { status: 500 }
     );
   }
