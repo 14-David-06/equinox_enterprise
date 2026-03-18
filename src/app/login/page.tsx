@@ -45,7 +45,7 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al verificar usuario');
+        throw new Error(data.detail || data.error || 'Error al verificar usuario');
       }
 
       if (!data.exists) {
